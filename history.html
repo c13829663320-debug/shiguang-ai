@@ -57,7 +57,7 @@
             })}
             <div class="page-content narrow">
               <div class="toolbar">
-                <div class="search-box">${getIcon('search', 16)}<input class="input" id="search-input" placeholder="搜索标题、正文或标签…" value="${SG.esc(state.query)}"></div>
+                <div class="search-box">${getIcon('search', 16)}<input class="input" id="search-input" placeholder="搜索标题、正文或标签…" value="${SG.esc(state.query)}" autocomplete="off"><div class="search-history" id="search-history" hidden></div></div>
                 <div class="filter-pills" id="type-pills">
                   <button class="pill ${state.type ? '' : 'active'}" data-type="">全部</button>
                   ${Object.entries(SG.typeMap).map(([key, value]) => `<button class="pill ${state.type === key ? 'active' : ''}" data-type="${key}">${value[0]}</button>`).join('')}
@@ -74,9 +74,27 @@
             </div>
           </main>`;
 
-        document.getElementById('search-input').addEventListener('input', debounce(event => {
-          state.query = event.target.value; renderList();
-        }, 200));
+        const input = document.getElementById('search-input');
+        input.addEventListener('input', debounce(event => { state.query = event.target.value; renderList(); }, 200));
+        input.addEventListener('focus', () => paintHistory(true));
+        input.addEventListener('keydown', event => {
+          if (event.key === 'Enter') {
+            const value = input.value.trim();
+            if (!value) return;
+            state.query = value; SG.rememberSearch(value); paintHistory(false); renderList();
+          } else if (event.key === 'Escape') { paintHistory(false); input.blur(); }
+        });
+        input.addEventListener('blur', () => setTimeout(() => paintHistory(false), 120));
+        const historyBox = document.getElementById('search-history');
+        historyBox.addEventListener('mousedown', event => event.preventDefault());
+        historyBox.addEventListener('click', event => {
+          const btn = event.target.closest('[data-history]'); if (!btn) return;
+          const value = btn.dataset.history;
+          if (value === '__clear') { SG.clearSearchHistory(); paintHistory(true); return; }
+          state.query = value; input.value = value; SG.rememberSearch(value);
+          paintHistory(false); renderList();
+        });
+        paintHistory(false);
         document.getElementById('type-pills').addEventListener('click', event => {
           const btn = event.target.closest('[data-type]'); if (!btn) return;
           if (btn.dataset.type === '__pin') state.pinned = !state.pinned;
@@ -164,16 +182,54 @@
         root.querySelector('#clear-day')?.addEventListener('click', () => { state.day = null; renderCalendar(); renderList(); });
       }
 
+      function paintHistory(open) {
+        const box = document.getElementById('search-history');
+        if (!box) return;
+        const list = SG.searchHistoryList();
+        if (!list.length) { box.hidden = true; return; }
+        box.innerHTML = `<div class="search-history-head"><span>最近搜索</span><button class="btn btn-ghost btn-sm" data-history="__clear">清空</button></div>
+          ${list.map(item => `<button class="search-history-item" data-history="${SG.esc(item)}">${getIcon('clock', 13)}<span>${SG.esc(item)}</span></button>`).join('')}`;
+        box.hidden = !open;
+      }
+
+      function relevance(record) {
+        const query = state.query.trim().toLowerCase();
+        if (!query) return 0;
+        const title = record.title.toLowerCase();
+        const tags = record.tags.join(' ').toLowerCase();
+        const content = (record.content || '').toLowerCase();
+        let score = 0;
+        if (title === query) score += 12;
+        else if (title.startsWith(query)) score += 8;
+        else if (title.includes(query)) score += 6;
+        if (record.tags.some(tag => tag.toLowerCase() === query)) score += 5;
+        else if (tags.includes(query)) score += 3;
+        if (content.includes(query)) score += 2;
+        return score;
+      }
+
+      function sortedRecords() {
+        const query = state.query.trim();
+        return filtered().slice().sort((a, b) =>
+          (query ? relevance(b) - relevance(a) : 0) ||
+          Number(b.pinned) - Number(a.pinned) ||
+          b.occurredAt - a.occurredAt);
+      }
+
       function renderList() {
         const root = document.getElementById('timeline-root');
         if (!root) return;
-        const records = filtered().slice().sort((a, b) => b.occurredAt - a.occurredAt);
+        const query = state.query.trim();
+        const records = sortedRecords();
         root.innerHTML = records.length ? `
           <div class="section-head" style="margin-bottom:20px">
-            <div><div class="section-kicker">TIMELINE</div><h2 class="section-title">共 ${records.length} 条记忆</h2></div>
-            ${state.day ? `<button class="btn btn-ghost btn-sm" id="clear-day-inline">${getIcon('x', 13)} ${SG.formatDate(state.day)}</button>` : ''}
+            <div><div class="section-kicker">${query ? 'SEARCH RESULTS' : 'TIMELINE'}</div><h2 class="section-title">${query ? `找到 ${records.length} 条相关记忆` : `共 ${records.length} 条记忆`}</h2></div>
+            <div class="row wrap">
+              ${query ? `<span class="muted small">按相关度排序</span>` : ''}
+              ${state.day ? `<button class="btn btn-ghost btn-sm" id="clear-day-inline">${getIcon('x', 13)} ${SG.formatDate(state.day)}</button>` : ''}
+            </div>
           </div>
-          <div class="timeline">${buildTimeline(records)}</div>` :
+          ${query ? `<div class="search-results">${records.map(item => recordItem(item, true)).join('')}</div>` : `<div class="timeline">${buildTimeline(records)}</div>`}` :
           renderEmptyState({
             icon: 'search', title: '没有匹配的记忆',
             description: state.day ? '这一天还没有留下记忆，换个日期或清除筛选再试。' : '换个关键词，或清除筛选条件再试一次。',
@@ -185,6 +241,27 @@
         root.querySelector('#clear-day-inline')?.addEventListener('click', () => {
           state.day = null; renderCalendar(); renderList();
         });
+      }
+
+      function recordItem(item, withDate) {
+        const [typeName, icon] = SG.typeMap[item.type] || SG.typeMap.text;
+        const excerpt = item.content || item.attachments.map(file => file.name).join('、') || '暂无文字描述';
+        return `<article class="card timeline-item" onclick="openRecordDetail('${item.id}')">
+          <div style="min-width:0">
+            <span class="memory-type">${getIcon(icon, 14)} ${typeName}${item.pinned ? ' · <span class="pin-mark">置顶</span>' : ''}${withDate ? `<span class="result-date">${SG.formatDate(item.occurredAt, false)}</span>` : ''}</span>
+            <h3 class="memory-title">${SG.highlight(item.title, state.query)}</h3>
+            <p class="memory-excerpt">${SG.highlight(excerpt, state.query)}</p>
+            <div class="memory-tags">${item.tags.slice(0, 4).map(tag => `<span class="tag">${SG.highlight(tag, state.query)}</span>`).join('')}</div>
+          </div>
+          <div>
+            <div class="timeline-time">${SG.formatTime(item.occurredAt)}</div>
+            <div class="timeline-actions">
+              <button class="btn btn-ghost btn-sm" title="置顶" onclick="pinRecord('${item.id}', event)">${getIcon('pin', 15)}</button>
+              <button class="btn btn-ghost btn-sm" title="编辑" onclick="editRecord('${item.id}', event)">${getIcon('edit', 15)}</button>
+              <button class="btn btn-ghost btn-sm" title="删除" onclick="removeRecord('${item.id}', event)">${getIcon('trash', 15)}</button>
+            </div>
+          </div>
+        </article>`;
       }
 
       function buildTimeline(records) {
@@ -200,25 +277,7 @@
           const items = byDay.get(key);
           return `<div class="timeline-day">
             <div class="timeline-date"><strong>${date.getMonth() + 1}月${date.getDate()}日</strong><span>${date.getFullYear()} · 周${'日一二三四五六'[date.getDay()]}</span></div>
-            <div class="timeline-items">${items.map(item => {
-              const [typeName, icon] = SG.typeMap[item.type] || SG.typeMap.text;
-              return `<article class="card timeline-item" onclick="openRecordDetail('${item.id}')">
-                <div style="min-width:0">
-                  <span class="memory-type">${getIcon(icon, 14)} ${typeName}${item.pinned ? ' · <span class="pin-mark">置顶</span>' : ''}</span>
-                  <h3 class="memory-title">${SG.esc(item.title)}</h3>
-                  <p class="memory-excerpt">${SG.esc(item.content || item.attachments.map(file => file.name).join('、') || '暂无文字描述')}</p>
-                  <div class="memory-tags">${item.tags.slice(0, 4).map(tag => `<span class="tag">${SG.esc(tag)}</span>`).join('')}</div>
-                </div>
-                <div>
-                  <div class="timeline-time">${SG.formatTime(item.occurredAt)}</div>
-                  <div class="timeline-actions">
-                    <button class="btn btn-ghost btn-sm" title="置顶" onclick="pinRecord('${item.id}', event)">${getIcon('pin', 15)}</button>
-                    <button class="btn btn-ghost btn-sm" title="编辑" onclick="editRecord('${item.id}', event)">${getIcon('edit', 15)}</button>
-                    <button class="btn btn-ghost btn-sm" title="删除" onclick="removeRecord('${item.id}', event)">${getIcon('trash', 15)}</button>
-                  </div>
-                </div>
-              </article>`;
-            }).join('')}</div>
+            <div class="timeline-items">${items.map(item => recordItem(item, false)).join('')}</div>
           </div>`;
         }).join('');
       }

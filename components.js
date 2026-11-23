@@ -130,7 +130,36 @@
     return out.join('');
   }
 
-  window.SG = { esc, typeMap, formatDate, formatTime, relativeTime, fileSize, download, fileToAttachment, markdown: renderMarkdown };
+  // 搜索结果高亮：按原文切分后逐段转义，避免命中特殊字符时破坏转义结果。
+  function highlight(text, query) {
+    const source = String(text ?? '');
+    const keyword = String(query || '').trim();
+    if (!keyword) return esc(source);
+    const pattern = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return source.split(new RegExp(`(${pattern})`, 'gi'))
+      .map((part, index) => index % 2 ? `<mark class="search-hit">${esc(part)}</mark>` : esc(part))
+      .join('');
+  }
+  const SEARCH_KEY = 'shiguangai_search_history';
+  function searchHistoryList() {
+    try {
+      const list = JSON.parse(localStorage.getItem(SEARCH_KEY) || '[]');
+      return Array.isArray(list) ? list.filter(item => typeof item === 'string' && item.trim()).slice(0, 5) : [];
+    } catch (error) { return []; }
+  }
+  function rememberSearch(keyword) {
+    const value = String(keyword || '').trim();
+    if (!value) return searchHistoryList();
+    const next = [value, ...searchHistoryList().filter(item => item !== value)].slice(0, 5);
+    try { localStorage.setItem(SEARCH_KEY, JSON.stringify(next)); } catch (error) { /* 隐私模式忽略 */ }
+    return next;
+  }
+  function clearSearchHistory() {
+    try { localStorage.removeItem(SEARCH_KEY); } catch (error) { /* 隐私模式忽略 */ }
+    return [];
+  }
+
+  window.SG = { esc, typeMap, formatDate, formatTime, relativeTime, fileSize, download, fileToAttachment, markdown: renderMarkdown, highlight, searchHistoryList, rememberSearch, clearSearchHistory };
 
   const applyTheme = (theme) => {
     const dark = theme === 'dark';

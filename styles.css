@@ -132,6 +132,17 @@ svg { flex: 0 0 auto; }
 .search-box .input { padding-left: 40px; }
 .toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; flex-wrap: wrap; }
 .toolbar .search-box { flex: 1; max-width: 460px; }
+.search-history { position: absolute; top: calc(100% + 7px); right: 0; left: 0; z-index: 40; padding: 6px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); box-shadow: var(--shadow); }
+.search-history-head { display: flex; align-items: center; justify-content: space-between; padding: 3px 6px 5px; color: var(--muted); font-size: 10px; letter-spacing: .12em; }
+.search-history-head .btn { padding: 2px 6px; font-size: 11px; }
+.search-history-item { display: flex; align-items: center; gap: 8px; width: 100%; padding: 8px 9px; border: 0; border-radius: 8px; background: transparent; color: var(--ink-soft); font-size: 12px; text-align: left; cursor: pointer; }
+.search-history-item:hover { background: var(--paper-deep); color: var(--ink); }
+.search-history-item svg { flex: none; color: var(--muted); }
+.search-history-item span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.search-hit { padding: 0 2px; border-radius: 3px; background: rgba(214, 168, 75, .32); color: inherit; }
+.tag .search-hit { background: rgba(214, 168, 75, .4); }
+.search-results { display: flex; flex-direction: column; gap: 12px; }
+.result-date { margin-left: 8px; color: var(--muted); font-size: 10px; }
 .filter-pills { display: flex; gap: 7px; flex-wrap: wrap; }
 .pill, .tag { display: inline-flex; align-items: center; gap: 5px; border-radius: 999px; line-height: 1.2; }
 .pill { min-height: 32px; padding: 7px 12px; border: 1px solid var(--line); background: transparent; color: var(--ink-soft); font-size: 12px; }
@@ -647,5 +658,7 @@ body.reduce-motion *, body.reduce-motion *::before, body.reduce-motion *::after 
 [data-theme="dark"] .review-hero { background: #1e2c29; }
 [data-theme="dark"] .notice { border-color: #4a3f26; background: #2b2718; color: #d8c79f; }
 [data-theme="dark"] .notice.success { border-color: #2d4a42; background: #1b2a26; color: var(--success); }
+[data-theme="dark"] .search-hit { background: rgba(224, 184, 98, .3); }
+[data-theme="dark"] .search-history { background: #1f2628; }
 
 
