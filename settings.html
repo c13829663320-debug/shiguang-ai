@@ -5,10 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>拾光AI · 设置</title>
   <meta name="theme-color" content="#1e2623">
+  <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="拾光AI">
   <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" type="image/png" href="icons/icon-192.png">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
   <link rel="stylesheet" href="styles.css">
 </head>
@@ -108,6 +110,10 @@
             ${settingRow('每日回顾提醒', 'reminder', '打开工作台时，自动提醒你回顾一条旧记忆。')}
             ${settingRow('减少动效', 'reduceMotion', '关闭卡片悬浮、弹窗动画等效果。')}
             <div class="setting-row">
+              <div><div class="setting-name">夜间模式</div><div class="setting-note">深色纸感主题，夜间查看更柔和。</div></div>
+              <button class="switch ${settings.theme === 'dark' ? 'active' : ''}" data-theme-toggle role="switch" aria-label="夜间模式"></button>
+            </div>
+            <div class="setting-row">
               <div><div class="setting-name">标签管理</div><div class="setting-note">重命名、合并或删除标签，相关记忆会同步更新。</div></div>
               <button class="btn btn-secondary btn-sm" id="open-tag-manager">管理标签</button>
             </div>
@@ -163,6 +169,16 @@
         const on = (id, handler) => { const el = document.getElementById(id); if (el) el.onclick = handler; };
 
         on('open-tag-manager', () => openTagManager());
+
+        const themeToggle = app.querySelector('[data-theme-toggle]');
+        if (themeToggle) {
+          themeToggle.onclick = () => {
+            const next = MemoryStore.settings().theme === 'dark' ? 'light' : 'dark';
+            setTheme(next);
+            themeToggle.classList.toggle('active', next === 'dark');
+            showToast(next === 'dark' ? '已切换到夜间模式' : '已切换到日间模式', 'success');
+          };
+        }
 
         const installButton = document.getElementById('install-app');
         if (installButton) {

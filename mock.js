@@ -19,6 +19,7 @@
     autoOrganize: true,
     reduceMotion: false,
     reminder: true,
+    theme: 'light',
     lastReviewAt: 0
   };
 

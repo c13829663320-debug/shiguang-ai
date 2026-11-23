@@ -87,6 +87,18 @@
     });
   }
   window.SG = { esc, typeMap, formatDate, formatTime, relativeTime, fileSize, download, fileToAttachment };
+
+  const applyTheme = (theme) => {
+    const dark = theme === 'dark';
+    document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute('content', dark ? '#15191b' : '#1e2623');
+  };
+  applyTheme(MemoryStore.settings().theme);
+  window.setTheme = (theme) => {
+    MemoryStore.updateSettings({ theme });
+    applyTheme(theme);
+  };
   let installPrompt = null;
   window.isAppInstalled = () => window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
   window.addEventListener('beforeinstallprompt', event => {
@@ -262,7 +274,7 @@
     const related = MemoryStore.relatedRecords(id, 3);
     const relatedHTML = related.length ? `<div class="related-block"><div class="related-title">${getIcon('link', 14)} 相关记忆</div><div class="related-list">${related.map(item => `<button class="related-item" data-related="${item.id}"><span class="related-item-title">${esc(item.title)}</span><span class="related-item-meta">${formatDate(item.occurredAt, false)} · ${item.sharedTags.length ? `共同标签：${item.sharedTags.map(esc).join('、')}` : '内容相近'}</span></button>`).join('')}</div></div>` : '';
     const overlay = document.createElement('div'); overlay.className = 'modal-overlay';
-    overlay.innerHTML = `<div class="modal modal-lg" role="dialog" aria-modal="true"><div class="modal-header"><div><span class="memory-type">${getIcon(icon, 14)} ${type}</span><h3 class="modal-title" style="margin-top:7px">${esc(record.title)}</h3></div><button class="btn btn-ghost btn-icon" data-close>${getIcon('x')}</button></div><div class="modal-body"><div class="detail-meta"><span>${getIcon('calendar', 13)} ${formatDate(record.occurredAt)} ${formatTime(record.occurredAt)}</span><span>${getIcon('smile', 13)} ${esc(record.mood)}</span><span>${esc(record.source)}</span></div><div class="memory-tags" style="margin-bottom:18px">${record.tags.map(tag => `<span class="tag tag-teal">${esc(tag)}</span>`).join('')}</div><div class="detail-content">${esc(record.content || '这条记忆只有附件，没有文字描述。')}</div>${record.attachments.map(attachmentHTML).join('')}${relatedHTML}</div><div class="modal-footer" style="justify-content:space-between"><div class="row"><button class="btn btn-ghost btn-sm" id="detail-pin">${getIcon('pin', 15)} ${record.pinned ? '取消置顶' : '置顶'}</button><button class="btn btn-ghost btn-sm" id="detail-delete">${getIcon('trash', 15)} 删除</button></div><div class="row"><button class="btn btn-secondary btn-sm" id="detail-share">${getIcon('image', 15)} 分享卡片</button><button class="btn btn-dark" id="detail-edit">${getIcon('edit', 15)} 编辑记忆</button></div></div></div>`;
+    overlay.innerHTML = `<div class="modal modal-lg" role="dialog" aria-modal="true"><div class="modal-header"><div><span class="memory-type">${getIcon(icon, 14)} ${type}</span><h3 class="modal-title" style="margin-top:7px">${esc(record.title)}</h3></div><button class="btn btn-ghost btn-icon" data-close>${getIcon('x')}</button></div><div class="modal-body"><div class="detail-meta"><span>${getIcon('calendar', 13)} ${formatDate(record.occurredAt)} ${formatTime(record.occurredAt)}</span><span>${getIcon('smile', 13)} ${esc(record.mood)}</span><span>${esc(record.source)}</span></div><div class="memory-tags" style="margin-bottom:18px">${record.tags.map(tag => `<span class="tag tag-teal">${esc(tag)}</span>`).join('')}</div><div class="detail-content">${esc(record.content || '这条记忆只有附件，没有文字描述。')}</div>${record.attachments.map(attachmentHTML).join('')}${relatedHTML}</div><div class="modal-footer detail-footer" style="justify-content:space-between"><div class="row"><button class="btn btn-ghost btn-sm" id="detail-pin">${getIcon('pin', 15)} ${record.pinned ? '取消置顶' : '置顶'}</button><button class="btn btn-ghost btn-sm" id="detail-delete">${getIcon('trash', 15)} 删除</button></div><div class="row"><button class="btn btn-secondary btn-sm" id="detail-share">${getIcon('image', 15)} 分享卡片</button><button class="btn btn-dark" id="detail-edit">${getIcon('edit', 15)} 编辑记忆</button></div></div></div>`;
     document.body.appendChild(overlay);
     overlay.querySelector('[data-close]').onclick = () => overlay.remove();
     overlay.querySelectorAll('[data-related]').forEach(btn => btn.onclick = () => { const nextId = btn.dataset.related; overlay.remove(); openRecordDetail(nextId); });
