@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>拾光AI · 时光轴</title>
+  <meta name="theme-color" content="#1e2623">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="拾光AI">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="app"></div>
+
+  <script src="mock.js"></script>
+  <script src="api.js"></script>
+  <script src="components.js"></script>
+  <script>
+    (function () {
+      const app = document.getElementById('app');
+      const params = new URLSearchParams(location.search);
+      const state = { query: params.get('query') || '', type: params.get('type') || '', tag: params.get('tag') || '', pinned: false, day: null };
+      const startToday = new Date(); startToday.setHours(0, 0, 0, 0);
+      let cal = { year: startToday.getFullYear(), month: startToday.getMonth() };
+      const dateStamp = () => new Date().toISOString().slice(0, 10);
+      const debounce = (fn, ms) => { let timer; return (...args) => { clearTimeout(timer); timer = setTimeout(() => fn(...args), ms); }; };
+
+      function filtered() {
+        const range = {};
+        if (state.day) {
+          const dayStart = new Date(state.day); dayStart.setHours(0, 0, 0, 0);
+          range.from = dayStart.getTime();
+          range.to = range.from + 86400000 - 1;
+        }
+        return MemoryStore.listRecords({
+          query: state.query, type: state.type, tag: state.tag,
+          pinned: state.pinned || undefined, ...range
+        });
+      }
+
+      function render() {
+        const tags = MemoryStore.tags().slice(0, 8);
+        app.innerHTML = `
+          ${renderSidebar('history')}
+          <main class="app-main">
+            ${renderPageHeader({
+              title: '时光轴', subtitle: '所有记忆，按发生的时间排列',
+              actions: `
+                <button class="btn btn-secondary" id="export-md">${getIcon('download', 16)}<span class="optional"> 导出 Markdown</span></button>
+                <button class="btn btn-secondary" id="export-json">${getIcon('download', 16)}<span class="optional"> 导出 JSON</span></button>
+                <button class="btn btn-primary" data-action="new-record">${getIcon('plus', 16)} 记一笔</button>`
+            })}
+            <div class="page-content narrow">
+              <div class="toolbar">
+                <div class="search-box">${getIcon('search', 16)}<input class="input" id="search-input" placeholder="搜索标题、正文或标签…" value="${SG.esc(state.query)}"></div>
+                <div class="filter-pills" id="type-pills">
+                  <button class="pill ${state.type ? '' : 'active'}" data-type="">全部</button>
+                  ${Object.entries(SG.typeMap).map(([key, value]) => `<button class="pill ${state.type === key ? 'active' : ''}" data-type="${key}">${value[0]}</button>`).join('')}
+                  <button class="pill ${state.pinned ? 'active' : ''}" data-type="__pin">${getIcon('pin', 13)} 置顶</button>
+                </div>
+              </div>
+              ${tags.length ? `<div class="filter-pills" id="tag-pills" style="margin:-12px 0 24px">
+                <span class="muted small" style="align-self:center">常用标签：</span>
+                <button class="pill ${state.tag ? '' : 'active'}" data-tag="">不限</button>
+                ${tags.map(tag => `<button class="pill ${state.tag === tag.name ? 'active' : ''}" data-tag="${SG.esc(tag.name)}">${SG.esc(tag.name)} · ${tag.count}</button>`).join('')}
+              </div>` : ''}
+              <div id="calendar-root"></div>
+              <div id="timeline-root"></div>
+            </div>
+          </main>`;
+
+        document.getElementById('search-input').addEventListener('input', debounce(event => {
+          state.query = event.target.value; renderList();
+        }, 200));
+        document.getElementById('type-pills').addEventListener('click', event => {
+          const btn = event.target.closest('[data-type]'); if (!btn) return;
+          if (btn.dataset.type === '__pin') state.pinned = !state.pinned;
+          else state.type = btn.dataset.type;
+          render();
+        });
+        document.getElementById('tag-pills')?.addEventListener('click', event => {
+          const btn = event.target.closest('[data-tag]'); if (!btn) return;
+          state.tag = btn.dataset.tag; render();
+        });
+        document.getElementById('export-md').onclick = () => {
+          SG.download(`拾光AI-记忆-${dateStamp()}.md`, MemoryStore.exportMarkdown(filtered()));
+          showToast('已导出当前筛选下的 Markdown', 'success');
+        };
+        document.getElementById('export-json').onclick = () => {
+          SG.download(`拾光AI-备份-${dateStamp()}.json`, MemoryStore.exportJSON());
+          showToast('已导出 JSON 备份（不含密钥）', 'success');
+        };
+        renderCalendar();
+        renderList();
+      }
+
+      function renderCalendar() {
+        const root = document.getElementById('calendar-root');
+        if (!root) return;
+        const data = MemoryStore.monthCounts(cal.year, cal.month);
+        const today = new Date();
+        const isCurrent = cal.year === today.getFullYear() && cal.month === today.getMonth();
+        const level = count => count === 0 ? 0 : count >= 5 ? 4 : count >= 3 ? 3 : count === 2 ? 2 : 1;
+        const blanks = Array.from({ length: data.firstWeekday }, () => '<span class="calendar-cell blank"></span>').join('');
+        const cells = Array.from({ length: data.daysInMonth }, (_, index) => {
+          const day = index + 1;
+          const date = new Date(cal.year, cal.month, day);
+          const count = data.counts[day] || 0;
+          const isToday = date.toDateString() === today.toDateString();
+          const isActive = Boolean(state.day) && new Date(state.day).toDateString() === date.toDateString();
+          const isFuture = date.getTime() > startToday.getTime();
+          return `<button class="calendar-cell lv${level(count)} ${isToday ? 'today' : ''} ${isActive ? 'active' : ''} ${isFuture ? 'future' : ''}" data-day="${day}" title="${cal.month + 1} 月 ${day} 日 · ${count} 条记忆" ${isFuture ? 'disabled' : ''}><span class="calendar-num">${day}</span></button>`;
+        }).join('');
+        root.innerHTML = `<section class="card calendar-section">
+          <div class="calendar-head">
+            <div><div class="section-kicker">MEMORY CALENDAR</div><h2 class="section-title">时光日历</h2></div>
+            <div class="row wrap">
+              <span class="calendar-total">本月 ${data.total} 条</span>
+              <div class="row calendar-nav">
+                <button class="btn btn-ghost btn-icon btn-sm" data-cal="prev" aria-label="上个月">${getIcon('left', 15)}</button>
+                <strong class="calendar-month">${cal.year} 年 ${cal.month + 1} 月</strong>
+                <button class="btn btn-ghost btn-icon btn-sm" data-cal="next" aria-label="下个月" ${isCurrent ? 'disabled' : ''}>${getIcon('right', 15)}</button>
+              </div>
+              ${isCurrent ? '' : `<button class="btn btn-secondary btn-sm" data-cal="today">${getIcon('refresh', 13)} 回到本月</button>`}
+            </div>
+          </div>
+          <div class="calendar-weekdays">${['一', '二', '三', '四', '五', '六', '日'].map(day => `<span>${day}</span>`).join('')}</div>
+          <div class="calendar-grid">${blanks}${cells}</div>
+          <div class="calendar-legend">
+            <span class="muted small">记录密度</span>
+            <span class="legend-cell lv0"></span><span class="legend-cell lv1"></span><span class="legend-cell lv2"></span><span class="legend-cell lv3"></span><span class="legend-cell lv4"></span>
+            <span class="muted small">少 → 多</span>
+            ${state.day ? `<button class="btn btn-ghost btn-sm" id="clear-day">${getIcon('x', 13)} 清除日期筛选</button>` : ''}
+          </div>
+        </section>`;
+        root.querySelectorAll('[data-cal]').forEach(btn => {
+          btn.onclick = () => {
+            const action = btn.dataset.cal;
+            if (action === 'today') cal = { year: today.getFullYear(), month: today.getMonth() };
+            else {
+              const cursor = new Date(cal.year, cal.month + (action === 'prev' ? -1 : 1), 1);
+              cal = { year: cursor.getFullYear(), month: cursor.getMonth() };
+            }
+            renderCalendar();
+          };
+        });
+        root.querySelectorAll('[data-day]').forEach(btn => {
+          btn.onclick = () => {
+            if (btn.classList.contains('lv0') && !btn.classList.contains('active')) {
+              showToast(`${cal.month + 1} 月 ${btn.dataset.day} 日还没有留下记忆`, 'info');
+              return;
+            }
+            const stamp = new Date(cal.year, cal.month, Number(btn.dataset.day)).getTime();
+            const sameDay = state.day && new Date(state.day).toDateString() === new Date(stamp).toDateString();
+            state.day = sameDay ? null : stamp;
+            renderCalendar(); renderList();
+          };
+        });
+        root.querySelector('#clear-day')?.addEventListener('click', () => { state.day = null; renderCalendar(); renderList(); });
+      }
+
+      function renderList() {
+        const root = document.getElementById('timeline-root');
+        if (!root) return;
+        const records = filtered().slice().sort((a, b) => b.occurredAt - a.occurredAt);
+        root.innerHTML = records.length ? `
+          <div class="section-head" style="margin-bottom:20px">
+            <div><div class="section-kicker">TIMELINE</div><h2 class="section-title">共 ${records.length} 条记忆</h2></div>
+            ${state.day ? `<button class="btn btn-ghost btn-sm" id="clear-day-inline">${getIcon('x', 13)} ${SG.formatDate(state.day)}</button>` : ''}
+          </div>
+          <div class="timeline">${buildTimeline(records)}</div>` :
+          renderEmptyState({
+            icon: 'search', title: '没有匹配的记忆',
+            description: state.day ? '这一天还没有留下记忆，换个日期或清除筛选再试。' : '换个关键词，或清除筛选条件再试一次。',
+            action: `<button class="btn btn-secondary" id="clear-filters">${getIcon('refresh', 15)} 清除全部筛选</button>`
+          });
+        root.querySelector('#clear-filters')?.addEventListener('click', () => {
+          state.query = ''; state.type = ''; state.tag = ''; state.pinned = false; state.day = null; render();
+        });
+        root.querySelector('#clear-day-inline')?.addEventListener('click', () => {
+          state.day = null; renderCalendar(); renderList();
+        });
+      }
+
+      function buildTimeline(records) {
+        const groups = [];
+        const byDay = new Map();
+        records.forEach(record => {
+          const key = new Date(record.occurredAt).toDateString();
+          if (!byDay.has(key)) { byDay.set(key, []); groups.push(key); }
+          byDay.get(key).push(record);
+        });
+        return groups.map(key => {
+          const date = new Date(key);
+          const items = byDay.get(key);
+          return `<div class="timeline-day">
+            <div class="timeline-date"><strong>${date.getMonth() + 1}月${date.getDate()}日</strong><span>${date.getFullYear()} · 周${'日一二三四五六'[date.getDay()]}</span></div>
+            <div class="timeline-items">${items.map(item => {
+              const [typeName, icon] = SG.typeMap[item.type] || SG.typeMap.text;
+              return `<article class="card timeline-item" onclick="openRecordDetail('${item.id}')">
+                <div style="min-width:0">
+                  <span class="memory-type">${getIcon(icon, 14)} ${typeName}${item.pinned ? ' · <span class="pin-mark">置顶</span>' : ''}</span>
+                  <h3 class="memory-title">${SG.esc(item.title)}</h3>
+                  <p class="memory-excerpt">${SG.esc(item.content || item.attachments.map(file => file.name).join('、') || '暂无文字描述')}</p>
+                  <div class="memory-tags">${item.tags.slice(0, 4).map(tag => `<span class="tag">${SG.esc(tag)}</span>`).join('')}</div>
+                </div>
+                <div>
+                  <div class="timeline-time">${SG.formatTime(item.occurredAt)}</div>
+                  <div class="timeline-actions">
+                    <button class="btn btn-ghost btn-sm" title="置顶" onclick="pinRecord('${item.id}', event)">${getIcon('pin', 15)}</button>
+                    <button class="btn btn-ghost btn-sm" title="编辑" onclick="editRecord('${item.id}', event)">${getIcon('edit', 15)}</button>
+                    <button class="btn btn-ghost btn-sm" title="删除" onclick="removeRecord('${item.id}', event)">${getIcon('trash', 15)}</button>
+                  </div>
+                </div>
+              </article>`;
+            }).join('')}</div>
+          </div>`;
+        }).join('');
+      }
+
+      window.pinRecord = (id, event) => { event.stopPropagation(); MemoryStore.togglePin(id); };
+      window.editRecord = (id, event) => { event.stopPropagation(); openRecordEditor(id); };
+      window.removeRecord = (id, event) => {
+        event.stopPropagation();
+        const record = MemoryStore.getRecord(id);
+        showConfirm({
+          title: '删除这条记忆？',
+          message: `「${record ? record.title : ''}」及其附件将被永久删除，建议先导出备份。`,
+          confirmText: '永久删除',
+          onConfirm: () => { MemoryStore.deleteRecord(id); showToast('记忆已删除', 'success'); }
+        });
+      };
+
+      window.addEventListener('shiguang:change', () => { renderCalendar(); renderList(); });
+      render();
+    })();
+  </script>
+</body>
+</html>

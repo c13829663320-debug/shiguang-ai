@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>拾光AI · 年度回顾</title>
+  <meta name="theme-color" content="#1e2623">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="拾光AI">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="app"></div>
+
+  <script src="mock.js"></script>
+  <script src="api.js"></script>
+  <script src="components.js"></script>
+  <script>
+    (function () {
+      const app = document.getElementById('app');
+      const years = MemoryStore.years();
+      const state = { year: years[0] || new Date().getFullYear() };
+
+      function render() {
+        const data = MemoryStore.annual(state.year);
+        const monthMax = Math.max(...data.months.map(month => month.count), 1);
+        const topTags = data.tags.slice(0, 6);
+
+        app.innerHTML = `
+          ${renderSidebar('insights')}
+          <main class="app-main">
+            ${renderPageHeader({
+              title: '年度回顾', subtitle: `${data.year} 年的记忆故事`,
+              actions: `
+                ${years.length > 1 ? `<select class="select annual-select" id="year-select" aria-label="选择年份">${years.map(year => `<option value="${year}" ${year === state.year ? 'selected' : ''}>${year} 年</option>`).join('')}</select>` : ''}
+                <button class="btn btn-primary" data-action="new-record">${getIcon('plus', 16)} 记一笔</button>`
+            })}
+            <div class="page-content narrow">
+              ${data.total ? `
+                <section class="annual-cover">
+                  <div class="annual-cover-top">
+                    <span class="annual-kicker">${getIcon('book', 14)} YEAR IN MEMORY</span>
+                    <span class="annual-range">${data.first ? `${SG.formatDate(data.first.occurredAt, false)} — ${SG.formatDate(data.last.occurredAt, false)}` : ''}</span>
+                  </div>
+                  <div class="annual-year">${data.year}</div>
+                  <h2 class="annual-title">这一年，你留下了 ${data.total} 条记忆。</h2>
+                  <p class="annual-sub">${data.words} 个字，${data.activeDays} 天有记录，最长连续 ${data.longestStreak} 天。它们不是流水账，而是这一年最真实的注脚。</p>
+                  <div class="annual-keywords">${topTags.map(tag => `<span>${SG.esc(tag.name)} · ${tag.count}</span>`).join('')}</div>
+                </section>
+
+                <div class="grid-4 section">
+                  <div class="card stat-card"><span class="stat-icon">${getIcon('book', 20)}</span><div class="stat-label">记录条数</div><div class="stat-value">${data.total}</div><div class="stat-note">条被保存的时光</div></div>
+                  <div class="card stat-card"><span class="stat-icon">${getIcon('calendar', 20)}</span><div class="stat-label">记录天数</div><div class="stat-value">${data.activeDays}</div><div class="stat-note">天里留下过记录</div></div>
+                  <div class="card stat-card"><span class="stat-icon">${getIcon('text', 20)}</span><div class="stat-label">写下字数</div><div class="stat-value">${data.words}</div><div class="stat-note">个字的私人历史</div></div>
+                  <div class="card stat-card"><span class="stat-icon">${getIcon('refresh', 20)}</span><div class="stat-label">最长连续</div><div class="stat-value">${data.longestStreak}</div><div class="stat-note">天没有中断记录</div></div>
+                </div>
+
+                <section class="card insight-card section">
+                  <div class="section-head">
+                    <div><div class="section-kicker">TWELVE MONTHS</div><h3 class="section-title">月度轨迹</h3></div>
+                    <span class="section-note">最丰盛：${data.busiestMonth.month} 月</span>
+                  </div>
+                  <div class="bar-chart annual-months">
+                    ${data.months.map(month => `<div class="bar-column"><span class="bar-value">${month.count}</span><span class="bar" style="height:${Math.max(4, Math.round(month.count / monthMax * 110))}px"></span><span class="bar-label">${month.month}月</span></div>`).join('')}
+                  </div>
+                </section>
+
+                <div class="insights-grid section">
+                  <section class="card insight-card">
+                    <div class="section-head">
+                      <div><div class="section-kicker">KEYWORDS</div><h3 class="section-title">年度关键词</h3></div>
+                      <span class="section-note">点击查看相关记忆</span>
+                    </div>
+                    <div class="tag-bars">${data.tags.slice(0, 8).map(tag => `<a class="tag-bar" href="history.html?tag=${encodeURIComponent(tag.name)}" title="查看「${SG.esc(tag.name)}」相关记忆"><span class="tag-bar-name">${SG.esc(tag.name)}</span><span class="tag-bar-track"><i style="width:${Math.round(tag.count / (data.tags[0]?.count || 1) * 100)}%"></i></span><span class="tag-bar-count">${tag.count}</span></a>`).join('')}</div>
+                  </section>
+                  <section class="card insight-card">
+                    <div class="section-head">
+                      <div><div class="section-kicker">MOODS</div><h3 class="section-title">心情底色</h3></div>
+                      <span class="section-note">最常出现：${SG.esc(data.topMood?.name || '平静')}</span>
+                    </div>
+                    <div class="tag-bars mood-bars">${data.moods.slice(0, 8).map(mood => `<div class="tag-bar"><span class="tag-bar-name">${SG.esc(mood.name)}</span><span class="tag-bar-track"><i style="width:${Math.round(mood.count / (data.moods[0]?.count || 1) * 100)}%"></i></span><span class="tag-bar-count">${mood.count}</span></div>`).join('')}</div>
+                  </section>
+                </div>
+
+                <section class="card insight-card section">
+                  <div class="section-head">
+                    <div><div class="section-kicker">HIGHLIGHTS</div><h3 class="section-title">代表记忆</h3></div>
+                    <span class="section-note">点击回看原文</span>
+                  </div>
+                  <div class="annual-memories">
+                    ${data.highlights.map((record, index) => `<button class="annual-memory" data-record="${record.id}"><span class="annual-memory-index">0${index + 1}</span><span class="annual-memory-body"><span class="annual-memory-title">${SG.esc(record.title)}</span><span class="annual-memory-excerpt">${SG.esc(String(record.content || '这条记忆只有附件。').slice(0, 72))}${String(record.content || '').length > 72 ? '…' : ''}</span><span class="annual-memory-meta">${SG.formatDate(record.occurredAt, false)} · ${record.tags.map(tag => SG.esc(tag)).join(' / ')}</span></span>${getIcon('right', 16)}</button>`).join('')}
+                  </div>
+                </section>
+
+                <section class="annual-closing">
+                  <div class="annual-closing-mark">${getIcon('sparkles', 18)}</div>
+                  <p>记录，是对时间最温柔的抵抗。</p>
+                  <span>${data.year} · 拾光AI · 本地记忆档案</span>
+                </section>
+              ` : renderEmptyState({
+                icon: 'book', title: `${data.year} 年还没有记忆`,
+                description: '换一个年份看看，或现在留下一条新的记忆，明年的回顾会因此多一页。',
+                action: `<button class="btn btn-primary" data-action="new-record">${getIcon('plus', 16)} 留下一条记忆</button>`
+              })}
+            </div>
+          </main>`;
+
+        const yearSelect = document.getElementById('year-select');
+        if (yearSelect) yearSelect.onchange = () => { state.year = Number(yearSelect.value); render(); };
+        app.querySelectorAll('[data-record]').forEach(button => {
+          button.onclick = () => openRecordDetail(button.dataset.record);
+        });
+      }
+
+      window.addEventListener('shiguang:change', render);
+      render();
+    })();
+  </script>
+</body>
+</html>

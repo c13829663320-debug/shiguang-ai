@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>拾光AI · 工作台</title>
+  <meta name="theme-color" content="#1e2623">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="拾光AI">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="app"></div>
+
+  <script src="mock.js"></script>
+  <script src="api.js"></script>
+  <script src="components.js"></script>
+  <script>
+    (function () {
+      const app = document.getElementById('app');
+      const QUOTES = [
+        '我们记得的，终将构成我们本身。',
+        '记录，是对时间最温柔的抵抗。',
+        '认真生活的人，值得被认真记住。',
+        '记忆不是仓库，而是一条回家的路。',
+        '把今天轻轻放下，明天才拿得起来。',
+        '所有微小的时刻，都在悄悄塑造你。'
+      ];
+      const greeting = () => {
+        const hour = new Date().getHours();
+        if (hour < 5) return '夜深了';
+        if (hour < 11) return '早上好';
+        if (hour < 14) return '中午好';
+        if (hour < 18) return '下午好';
+        return '晚上好';
+      };
+
+      function echoCard(record, mode) {
+        const date = new Date(record.occurredAt);
+        const years = new Date().getFullYear() - date.getFullYear();
+        const [typeName, icon] = SG.typeMap[record.type] || SG.typeMap.text;
+        const label = mode === 'same-day' ? `${years} 年前的今天` : `${date.getFullYear()} 年 ${date.getMonth() + 1} 月 ${date.getDate()} 日`;
+        return `<article class="card echo-card" onclick="openRecordDetail('${record.id}')">
+          <div class="echo-badge">${getIcon('clock', 13)} ${label}</div>
+          <h3 class="memory-title">${SG.esc(record.title)}</h3>
+          <p class="memory-excerpt">${SG.esc(record.content || record.attachments.map(file => file.name).join('、') || '暂无文字描述')}</p>
+          <div class="memory-footer"><div class="memory-tags">${record.tags.slice(0, 3).map(tag => `<span class="tag">${SG.esc(tag)}</span>`).join('')}</div><span class="row small muted" style="gap:5px">${getIcon(icon, 13)} ${typeName}</span></div>
+        </article>`;
+      }
+
+      function echoSection(echo) {
+        if (echo.mode === 'same-day') {
+          const years = new Date().getFullYear() - new Date(echo.items[0].occurredAt).getFullYear();
+          return `<section class="section">
+            <div class="section-head">
+              <div><div class="section-kicker">ON THIS DAY</div><h2 class="section-title">那年今日</h2></div>
+              <span class="section-note">${years} 年前的今天，你留下了这些</span>
+            </div>
+            <div class="memory-grid echo-grid">${echo.items.map(item => echoCard(item, 'same-day')).join('')}</div>
+          </section>`;
+        }
+        if (echo.mode === 'past') {
+          return `<section class="section">
+            <div class="section-head">
+              <div><div class="section-kicker">FROM THE PAST</div><h2 class="section-title">旧时光</h2></div>
+              <a class="section-link" href="history.html">去时光轴看看 ${getIcon('right', 14)}</a>
+            </div>
+            <div class="memory-grid echo-grid">${echo.items.map(item => echoCard(item, 'past')).join('')}</div>
+          </section>`;
+        }
+        return `<section class="section">
+          <div class="section-head"><div><div class="section-kicker">ON THIS DAY</div><h2 class="section-title">那年今日</h2></div></div>
+          <div class="card echo-empty">${getIcon('sparkles', 22)}<div><strong>今天还没有同一天的旧记忆。</strong><span>从今天开始记录，明年的此刻，这里就会出现你的「那年今日」。</span></div><button class="btn btn-secondary btn-sm" data-action="new-record">${getIcon('plus', 14)} 留下此刻</button></div>
+        </section>`;
+      }
+
+      function render() {
+        const stats = MemoryStore.stats();
+        const settings = MemoryStore.settings();
+        const records = MemoryStore.listRecords();
+        const recent = records.slice(0, 6);
+        const now = new Date();
+        const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+        const todayCount = records.filter(r => r.occurredAt >= todayStart.getTime()).length;
+        const quote = QUOTES[now.getDate() % QUOTES.length];
+        const topTag = stats.tags[0];
+        const topMood = MemoryStore.moods()[0];
+        const echo = MemoryStore.onThisDay(3);
+
+        app.innerHTML = `
+          ${renderSidebar('home')}
+          <main class="app-main">
+            ${renderPageHeader({
+              title: '工作台', subtitle: '随手记录，自动归档，随时找回',
+              actions: `
+                <a class="btn btn-secondary" href="assistant.html">${getIcon('sparkles', 16)}<span class="optional"> 问记忆助手</span></a>
+                <button class="btn btn-dark" data-action="new-record">${getIcon('plus', 16)} 完整记录</button>`
+            })}
+            <div class="page-content">
+              <div class="hero-grid">
+                <section class="card capture-card">
+                  <div class="capture-kicker">${getIcon('sparkles', 14)} SHIGUANG · ${now.toLocaleDateString('zh-CN', { month: 'long', day: 'numeric' })} · 周${'日一二三四五六'[now.getDay()]}</div>
+                  <h2 class="capture-title">${greeting()}，${SG.esc(settings.name)}。<br>今天想留下什么？</h2>
+                  <p class="capture-sub">一句话也足够。它会自动归档、编目，未来的你随时可以找回。</p>
+                  <div class="quick-capture">
+                    <textarea class="textarea" id="quick-text" placeholder="比如：今天终于听懂了那段英语播客，很开心。"></textarea>
+                    <button class="btn btn-primary" id="quick-save">${getIcon('send', 16)} 存入时光</button>
+                  </div>
+                  <div class="capture-types">
+                    <button data-preset="image">${getIcon('image', 15)} 照片</button>
+                    <button data-preset="audio">${getIcon('mic', 15)} 语音</button>
+                    <button data-preset="video">${getIcon('video', 15)} 视频</button>
+                    <button data-preset="document">${getIcon('file', 15)} 文档</button>
+                    <button data-preset="link">${getIcon('link', 15)} 链接</button>
+                  </div>
+                </section>
+                <section class="card today-card">
+                  <div class="today-month">${now.getFullYear()} 年 ${now.getMonth() + 1} 月 · 周${'日一二三四五六'[now.getDay()]}</div>
+                  <div class="today-number">${now.getDate()}</div>
+                  <div class="today-quote">“${quote}”</div>
+                  <div class="today-note">今日已记录 ${todayCount} 条 · 连续记录 ${stats.streak} 天</div>
+                  <button class="today-review" id="open-daily-review">${getIcon('sparkles', 14)} 今日回顾</button>
+                </section>
+              </div>
+
+              <div class="grid-4 section">
+                <div class="card stat-card"><span class="stat-icon">${getIcon('book', 20)}</span><div class="stat-label">记忆总数</div><div class="stat-value">${stats.total}</div><div class="stat-note">条被保存的时光</div></div>
+                <div class="card stat-card"><span class="stat-icon">${getIcon('calendar', 20)}</span><div class="stat-label">本周新增</div><div class="stat-value">${stats.week}</div><div class="stat-note">条新鲜的记录</div></div>
+                <div class="card stat-card"><span class="stat-icon">${getIcon('refresh', 20)}</span><div class="stat-label">连续记录</div><div class="stat-value">${stats.streak}</div><div class="stat-note">天不断更的坚持</div></div>
+                <div class="card stat-card"><span class="stat-icon">${getIcon('folder', 20)}</span><div class="stat-label">附件资料</div><div class="stat-value">${stats.attachments}</div><div class="stat-note">份收藏的凭证</div></div>
+              </div>
+
+              ${topTag ? `<div class="insight-strip">${getIcon('sparkles', 16)}<span>最近最常见的主题是 <strong>「${SG.esc(topTag.name)}」</strong>（${topTag.count} 次），高频心情是 <strong>「${topMood ? SG.esc(topMood.name) : '平静'}」</strong>。坚持记录，它们会在周复盘中变成洞察。</span></div>` : `<div class="insight-strip">${getIcon('info', 16)}<span>还没有足够的记录。留下第一条，洞察会随之出现。</span></div>`}
+
+              ${echoSection(echo)}
+
+              <section class="section">
+                <div class="section-head">
+                  <div><div class="section-kicker">RECENT MEMORIES</div><h2 class="section-title">最近的记忆</h2></div>
+                  <a class="section-link" href="history.html">查看时光轴 ${getIcon('right', 14)}</a>
+                </div>
+                ${recent.length ? `<div class="memory-grid">${recent.map(renderRecordCard).join('')}</div>` : renderEmptyState({
+                  icon: 'book', title: '记忆库还是空的',
+                  description: '第一条记录可以从上面的一句话开始，也可以附一张照片、一段语音。',
+                  action: `<button class="btn btn-primary" data-action="new-record">${getIcon('plus', 16)} 留下第一条记忆</button>`
+                })}
+              </section>
+            </div>
+          </main>`;
+
+        document.getElementById('quick-save').onclick = quickSave;
+        document.getElementById('quick-text').addEventListener('keydown', event => {
+          if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) quickSave();
+        });
+        app.querySelectorAll('[data-preset]').forEach(btn => {
+          btn.onclick = () => openRecordEditor(null, null, { type: btn.dataset.preset });
+        });
+        document.getElementById('open-daily-review').onclick = () => openDailyReview();
+      }
+
+      function quickSave() {
+        const input = document.getElementById('quick-text');
+        const content = input.value.trim();
+        if (!content) { showToast('先写下一句话，再存入时光。', 'error'); return; }
+        try {
+          MemoryStore.createRecord({ content, source: '快速记录' });
+          showToast('这一刻，已存入时光', 'success');
+        } catch (error) {
+          showToast(error.message, 'error', 5000);
+        }
+      }
+
+      window.addEventListener('shiguang:change', render);
+      render();
+
+      let reviewShown = false;
+      try { reviewShown = sessionStorage.getItem('shiguang-daily-review') === '1'; } catch (error) { reviewShown = false; }
+      if (!reviewShown && MemoryStore.settings().reminder && !MemoryStore.reviewedToday() && MemoryStore.dailyReview()) {
+        try { sessionStorage.setItem('shiguang-daily-review', '1'); } catch (error) { /* 浏览器禁用存储时仅跳过本次自动提醒 */ }
+        setTimeout(() => openDailyReview(), 700);
+      }
+    })();
+  </script>
+</body>
+</html>

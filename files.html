@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>拾光AI · 资料库</title>
+  <meta name="theme-color" content="#1e2623">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="拾光AI">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="app"></div>
+
+  <script src="mock.js"></script>
+  <script src="api.js"></script>
+  <script src="components.js"></script>
+  <script>
+    (function () {
+      const app = document.getElementById('app');
+      const state = { type: '' };
+
+      const allFiles = () => MemoryStore.attachments();
+      const shown = () => allFiles().filter(file => !state.type || file.type === state.type);
+
+      function storageUsage() {
+        try { return new Blob([localStorage.getItem(MemoryStore.key) || '']).size; }
+        catch (error) { return 0; }
+      }
+
+      function render() {
+        const files = shown();
+        const used = storageUsage();
+        const quota = 5 * 1024 * 1024;
+        const percent = Math.min(100, Math.round(used / quota * 100));
+
+        app.innerHTML = `
+          ${renderSidebar('files')}
+          <main class="app-main">
+            ${renderPageHeader({
+              title: '资料库', subtitle: '记忆里的附件，统一在这里查看与管理',
+              actions: `<span class="badge">${getIcon('folder', 13)} ${allFiles().length} 份附件</span>`
+            })}
+            <div class="page-content">
+              <div class="upload-zone" id="upload-zone">
+                <span class="upload-icon">${getIcon('upload', 21)}</span>
+                <div style="flex:1">
+                  <strong>添加新资料</strong>
+                  <p class="small muted" style="margin-top:3px">点击选择或把文件拖到这里，将创建一条新记忆并附上它（单个不超过 2MB）</p>
+                </div>
+                <button class="btn btn-primary">${getIcon('plus', 15)} 选择文件</button>
+                <input type="file" id="file-input" multiple hidden accept="image/*,audio/*,video/*,.txt,.md,.csv,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx">
+              </div>
+
+              <div class="toolbar section" style="margin-top:26px">
+                <div class="filter-pills" id="type-pills">
+                  <button class="pill ${state.type ? '' : 'active'}" data-type="">全部</button>
+                  ${[['image', '照片'], ['audio', '语音'], ['video', '视频'], ['document', '文档']].map(([key, label]) => `<button class="pill ${state.type === key ? 'active' : ''}" data-type="${key}">${label}</button>`).join('')}
+                </div>
+                <div style="flex:1"></div>
+                <div style="min-width:200px; max-width:280px; flex:1">
+                  <div class="row spread small muted" style="margin-bottom:5px"><span>本地存储 ${SG.fileSize(used)}</span><span>上限约 5MB</span></div>
+                  <div class="storage-bar"><span style="width:${percent}%"></span></div>
+                </div>
+              </div>
+
+              ${files.length ? `<div class="file-grid">${files.map((file, index) => fileCard(file, index)).join('')}</div>` :
+                renderEmptyState({
+                  icon: 'folder', title: '资料库还是空的',
+                  description: '在记录里添加照片、语音或文档，它们会集中出现在这里。',
+                  action: `<button class="btn btn-primary" data-action="new-record">${getIcon('plus', 16)} 去添加</button>`
+                })}
+            </div>
+          </main>`;
+
+        const zone = document.getElementById('upload-zone');
+        const input = document.getElementById('file-input');
+        zone.onclick = () => input.click();
+        input.onchange = event => handleFiles(event.target.files);
+        zone.addEventListener('dragover', event => { event.preventDefault(); zone.classList.add('dragover'); });
+        zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
+        zone.addEventListener('drop', event => {
+          event.preventDefault(); zone.classList.remove('dragover');
+          handleFiles(event.dataTransfer.files);
+        });
+        document.getElementById('type-pills').addEventListener('click', event => {
+          const btn = event.target.closest('[data-type]'); if (!btn) return;
+          state.type = btn.dataset.type; render();
+        });
+      }
+
+      function fileCard(file, index) {
+        const [typeName, icon] = SG.typeMap[file.type] || SG.typeMap.document;
+        return `<div class="card file-card">
+          <div class="file-preview" onclick="openRecordDetail('${file.recordId}')">${file.type === 'image' && file.dataUrl ? `<img src="${file.dataUrl}" alt="${SG.esc(file.name)}">` : getIcon(icon, 26)}</div>
+          <div class="file-info">
+            <div class="file-name" title="${SG.esc(file.name)}">${SG.esc(file.name)}</div>
+            <div class="file-meta">${typeName} · ${SG.fileSize(file.size)} · 来自「${SG.esc(file.recordTitle)}」</div>
+            <div class="file-actions">
+              <button class="btn btn-secondary btn-sm" onclick="openRecordDetail('${file.recordId}')">${getIcon('eye', 13)} 查看</button>
+              <button class="btn btn-secondary btn-sm" onclick="downloadFile(${index})">${getIcon('download', 13)} 下载</button>
+              <button class="btn btn-danger btn-sm" onclick="removeFile('${file.recordId}', '${file.id}')">${getIcon('trash', 13)} 移除</button>
+            </div>
+          </div>
+        </div>`;
+      }
+
+      window.downloadFile = (index) => {
+        const file = shown()[index];
+        if (file && file.dataUrl) SG.download(file.name, file.dataUrl);
+        else showToast('这份资料没有可下载的内容。', 'error');
+      };
+      window.removeFile = (recordId, attachmentId) => {
+        showConfirm({
+          title: '移除这份资料？',
+          message: '它将从所属记忆中移除，记忆本身不会被删除。',
+          confirmText: '移除附件',
+          onConfirm: () => { MemoryStore.deleteAttachment(recordId, attachmentId); showToast('附件已移除', 'success'); }
+        });
+      };
+
+      async function handleFiles(fileList) {
+        const files = Array.from(fileList || []);
+        if (!files.length) return;
+        const attachments = [];
+        try { for (const file of files) attachments.push(await SG.fileToAttachment(file)); }
+        catch (error) { showToast(error.message, 'error', 5000); }
+        if (attachments.length) openRecordEditor(null, null, { attachments, source: '资料上传' });
+      }
+
+      window.addEventListener('shiguang:change', render);
+      render();
+    })();
+  </script>
+</body>
+</html>

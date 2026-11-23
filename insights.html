@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>拾光AI · 主题洞察</title>
+  <meta name="theme-color" content="#1e2623">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="拾光AI">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="app"></div>
+
+  <script src="mock.js"></script>
+  <script src="api.js"></script>
+  <script src="components.js"></script>
+  <script>
+    (function () {
+      const app = document.getElementById('app');
+      const TYPE_COLORS = { text: '#2a6f6a', image: '#e76f51', audio: '#d6a84b', video: '#8a9a5b', link: '#8a7b9b', document: '#b0795e' };
+      const WEEKDAYS = ['一', '二', '三', '四', '五', '六', '日'];
+      let graphTag = '';
+
+      function layoutGraph(nodes, links) {
+        const W = 820; const H = 500;
+        const center = { x: W / 2, y: H / 2 };
+        nodes.forEach((node, index) => {
+          const angle = (index / Math.max(1, nodes.length)) * Math.PI * 2;
+          const radius = 120 + (index % 3) * 42;
+          node.x = center.x + Math.cos(angle) * radius;
+          node.y = center.y + Math.sin(angle) * radius;
+        });
+        const byId = new Map(nodes.map(node => [node.id, node]));
+        for (let step = 0; step < 320; step += 1) {
+          for (let i = 0; i < nodes.length; i += 1) {
+            for (let j = i + 1; j < nodes.length; j += 1) {
+              const a = nodes[i]; const b = nodes[j];
+              let dx = b.x - a.x; let dy = b.y - a.y;
+              const dist = Math.hypot(dx, dy) || 1;
+              const force = 2800 / (dist * dist);
+              dx /= dist; dy /= dist;
+              a.x -= dx * force; a.y -= dy * force;
+              b.x += dx * force; b.y += dy * force;
+            }
+          }
+          links.forEach(link => {
+            const a = byId.get(link.source); const b = byId.get(link.target);
+            if (!a || !b) return;
+            const dx = b.x - a.x; const dy = b.y - a.y;
+            const dist = Math.hypot(dx, dy) || 1;
+            const force = (dist - 110) * 0.012 * Math.min(2.2, 0.7 + link.weight * 0.35);
+            a.x += dx / dist * force; a.y += dy / dist * force;
+            b.x -= dx / dist * force; b.y -= dy / dist * force;
+          });
+          nodes.forEach(node => {
+            node.x += (center.x - node.x) * 0.006;
+            node.y += (center.y - node.y) * 0.008;
+            node.x = Math.max(80, Math.min(W - 80, node.x));
+            node.y = Math.max(56, Math.min(H - 56, node.y));
+          });
+        }
+        const xs = nodes.map(node => node.x); const ys = nodes.map(node => node.y);
+        const spanX = Math.max(1, Math.max(...xs) - Math.min(...xs));
+        const spanY = Math.max(1, Math.max(...ys) - Math.min(...ys));
+        const scale = Math.min((W - 220) / spanX, (H - 180) / spanY, 1.8);
+        const offsetX = (W - spanX * scale) / 2 - Math.min(...xs) * scale;
+        const offsetY = (H - spanY * scale) / 2 - Math.min(...ys) * scale;
+        nodes.forEach(node => { node.x = node.x * scale + offsetX; node.y = node.y * scale + offsetY; });
+        return { W, H };
+      }
+
+      function renderGraph() {
+        const root = document.getElementById('graph-root');
+        if (!root) return;
+        const data = MemoryStore.graph();
+        if (!data.nodes.length) { root.innerHTML = '<div class="graph-empty">还没有可以连线的记忆。</div>'; return; }
+        const { W, H } = layoutGraph(data.nodes, data.links);
+        const byId = new Map(data.nodes.map(node => [node.id, node]));
+        const maxDegree = Math.max(...data.nodes.map(node => node.degree), 1);
+        const insightsData = MemoryStore.insights();
+        const filters = `<div class="graph-filters"><button class="graph-chip ${graphTag ? '' : 'active'}" data-graph-tag="">全部</button>${insightsData.tags.slice(0, 6).map(tag => `<button class="graph-chip ${graphTag === tag.name ? 'active' : ''}" data-graph-tag="${SG.esc(tag.name)}">${SG.esc(tag.name)}</button>`).join('')}</div>`;
+        const lines = data.links.map(link => {
+          const a = byId.get(link.source); const b = byId.get(link.target);
+          const dim = graphTag && !(a.tags.includes(graphTag) && b.tags.includes(graphTag));
+          return `<line x1="${a.x.toFixed(1)}" y1="${a.y.toFixed(1)}" x2="${b.x.toFixed(1)}" y2="${b.y.toFixed(1)}" stroke-width="${Math.min(3, 0.8 + link.weight * 0.7).toFixed(2)}"${dim ? ' class="dim"' : ''}></line>`;
+        }).join('');
+        const nodes = data.nodes.map(node => {
+          const dim = graphTag && !node.tags.includes(graphTag);
+          const radius = 11 + Math.round(node.degree / maxDegree * 8);
+          return `<g class="graph-node ${dim ? 'dim' : ''}" data-record="${node.id}" tabindex="0" role="button" aria-label="${SG.esc(node.title)}"><title>${SG.esc(node.title)} · ${SG.esc(node.tags.join('、'))}</title><circle cx="${node.x.toFixed(1)}" cy="${node.y.toFixed(1)}" r="${radius}" fill="${TYPE_COLORS[node.type] || '#2a6f6a'}"></circle><text x="${node.x.toFixed(1)}" y="${(node.y + radius + 15).toFixed(1)}" text-anchor="middle">${SG.esc(node.title.slice(0, 12))}</text></g>`;
+        }).join('');
+        const legend = insightsData.types.map(item => `<span class="graph-legend-item"><span class="type-dot" style="background:${TYPE_COLORS[item.name] || '#c9c4b8'}"></span>${SG.typeMap[item.name]?.[0] || item.name}</span>`).join('');
+        root.innerHTML = `${filters}<div class="graph-canvas"><svg class="graph-svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="记忆关联图谱"><g>${lines}</g><g>${nodes}</g></svg></div><div class="graph-legend">${legend}<span class="graph-legend-item">${getIcon('info', 12)} 节点越大，关联越多；点击节点查看记忆</span></div>`;
+        root.querySelectorAll('[data-graph-tag]').forEach(btn => btn.onclick = () => {
+          const value = btn.dataset.graphTag;
+          graphTag = !value ? '' : (graphTag === value ? '' : value);
+          renderGraph();
+        });
+        root.querySelectorAll('.graph-node').forEach(node => {
+          node.onclick = () => window.openRecordDetail(node.dataset.record);
+          node.onkeydown = event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); window.openRecordDetail(node.dataset.record); } };
+        });
+      }
+
+      function donutGradient(types, total) {
+        let cursor = 0;
+        const stops = types.map(item => {
+          const start = cursor / total * 360; cursor += item.count;
+          const end = cursor / total * 360;
+          return `${TYPE_COLORS[item.name] || '#c9c4b8'} ${start.toFixed(2)}deg ${end.toFixed(2)}deg`;
+        });
+        return `conic-gradient(${stops.join(', ')})`;
+      }
+
+      function render() {
+        const data = MemoryStore.insights();
+        const hasRecords = data.total > 0;
+        const maxWeekday = Math.max(...data.weekday, 1);
+        const maxTag = data.tags[0]?.count || 1;
+        const maxMood = data.moods[0]?.count || 1;
+        const maxMonth = Math.max(...data.months.map(month => month.count), 1);
+        const monthTotal = data.months.reduce((sum, month) => sum + month.count, 0);
+        const busiestLabel = data.weekday.some(count => count > 0) ? `周${WEEKDAYS[data.busiestWeekday]}` : '—';
+
+        app.innerHTML = `
+          ${renderSidebar('insights')}
+          <main class="app-main">
+            ${renderPageHeader({
+              title: '主题洞察', subtitle: '从你的记忆里，看见反复出现的主题与习惯',
+              actions: `
+                <a class="btn btn-secondary" href="annual.html">${getIcon('book', 16)}<span class="optional"> 年度回顾</span></a>
+                <button class="btn btn-primary" data-action="new-record">${getIcon('plus', 16)} 记一笔</button>`
+            })}
+            <div class="page-content narrow">
+              ${hasRecords ? `
+                <div class="grid-4">
+                  <div class="card stat-card"><span class="stat-icon">${getIcon('book', 20)}</span><div class="stat-label">记忆总数</div><div class="stat-value">${data.total}</div><div class="stat-note">条被保存的时光</div></div>
+                  <div class="card stat-card"><span class="stat-icon">${getIcon('calendar', 20)}</span><div class="stat-label">记录天数</div><div class="stat-value">${data.activeDays}</div><div class="stat-note">天里留下过记录</div></div>
+                  <div class="card stat-card"><span class="stat-icon">${getIcon('tag', 20)}</span><div class="stat-label">涉及主题</div><div class="stat-value">${data.tags.length}</div><div class="stat-note">个被使用过的标签</div></div>
+                  <div class="card stat-card"><span class="stat-icon">${getIcon('refresh', 20)}</span><div class="stat-label">平均每周</div><div class="stat-value">${data.averagePerWeek}</div><div class="stat-note">条持续发生的记录</div></div>
+                </div>
+
+                <div class="insight-strip">${getIcon('sparkles', 16)}<span>你最常记录的主题是 <strong>「${SG.esc(data.topTag?.name || '日常')}」</strong>（${data.topTag?.count || 0} 次），高频心情是 <strong>「${SG.esc(data.topMood?.name || '平静')}」</strong>，记录最集中的时段是 <strong>「${data.peakPeriod.label}」</strong>。</span></div>
+
+                <section class="card insight-card section">
+                  <div class="section-head">
+                    <div><div class="section-kicker">CONNECTIONS</div><h3 class="section-title">记忆关联图谱</h3></div>
+                    <span class="section-note">共同标签与相似内容会自动连线</span>
+                  </div>
+                  <div id="graph-root"></div>
+                </section>
+
+                <div class="insights-grid section">
+                  <section class="card insight-card">
+                    <div class="section-head">
+                      <div><div class="section-kicker">TOPICS</div><h3 class="section-title">主题分布</h3></div>
+                      <span class="section-note">点击标签查看记忆 · <button class="section-action" onclick="openTagManager()">管理</button></span>
+                    </div>
+                    <div class="tag-bars">${data.tags.slice(0, 8).map(tag => `<a class="tag-bar" href="history.html?tag=${encodeURIComponent(tag.name)}" title="查看「${SG.esc(tag.name)}」相关记忆"><span class="tag-bar-name">${SG.esc(tag.name)}</span><span class="tag-bar-track"><i style="width:${Math.round(tag.count / maxTag * 100)}%"></i></span><span class="tag-bar-count">${tag.count}</span></a>`).join('')}</div>
+                  </section>
+                  <section class="card insight-card">
+                    <div class="section-head">
+                      <div><div class="section-kicker">MOODS</div><h3 class="section-title">心情光谱</h3></div>
+                      <span class="section-note">共 ${data.moods.reduce((sum, mood) => sum + mood.count, 0)} 次标记</span>
+                    </div>
+                    <div class="tag-bars mood-bars">${data.moods.slice(0, 8).map(mood => `<div class="tag-bar"><span class="tag-bar-name">${SG.esc(mood.name)}</span><span class="tag-bar-track"><i style="width:${Math.round(mood.count / maxMood * 100)}%"></i></span><span class="tag-bar-count">${mood.count}</span></div>`).join('')}</div>
+                  </section>
+                </div>
+
+                <div class="insights-grid section">
+                  <section class="card insight-card">
+                    <div class="section-head">
+                      <div><div class="section-kicker">RHYTHM</div><h3 class="section-title">记录习惯</h3></div>
+                      <span class="section-note">最活跃：${busiestLabel}</span>
+                    </div>
+                    <div class="bar-chart">
+                      ${data.weekday.map((count, index) => `<div class="bar-column"><span class="bar-value">${count}</span><span class="bar" style="height:${Math.max(4, Math.round(count / maxWeekday * 110))}px"></span><span class="bar-label">周${WEEKDAYS[index]}</span></div>`).join('')}
+                    </div>
+                    <div class="period-list">${data.periods.map(period => `<div class="period-item"><div class="period-label">${period.label} · ${period.range}</div><div class="period-value">${period.count}<span class="period-note">条</span></div></div>`).join('')}</div>
+                  </section>
+                  <section class="card insight-card">
+                    <div class="section-head">
+                      <div><div class="section-kicker">TYPES</div><h3 class="section-title">记忆类型</h3></div>
+                      <span class="section-note">${data.types.length} 种载体</span>
+                    </div>
+                    <div class="insight-split">
+                      <div class="type-donut" style="background:${donutGradient(data.types, data.total)}"><div class="type-donut-center"><strong>${data.total}</strong><span>条记忆</span></div></div>
+                      <div class="type-legend">${data.types.map(item => `<div class="type-legend-item"><span class="type-dot" style="background:${TYPE_COLORS[item.name] || '#c9c4b8'}"></span><span>${SG.typeMap[item.name]?.[0] || item.name}</span><span class="type-legend-count">${item.count} · ${Math.round(item.count / data.total * 100)}%</span></div>`).join('')}</div>
+                    </div>
+                  </section>
+                </div>
+
+                <section class="card insight-card section">
+                  <div class="section-head">
+                    <div><div class="section-kicker">SIX MONTHS</div><h3 class="section-title">最近六个月</h3></div>
+                    <span class="section-note">共 ${monthTotal} 条</span>
+                  </div>
+                  <div class="bar-chart">
+                    ${data.months.map(month => `<div class="bar-column"><span class="bar-value">${month.count}</span><span class="bar" style="height:${Math.max(4, Math.round(month.count / maxMonth * 130))}px"></span><span class="bar-label">${month.label}</span></div>`).join('')}
+                  </div>
+                </section>
+              ` : renderEmptyState({
+                icon: 'compass', title: '还没有足够的记录',
+                description: '主题、心情与记录习惯会在你留下记忆后慢慢浮现。先记录一件今天发生的小事吧。',
+                action: `<button class="btn btn-primary" data-action="new-record">${getIcon('plus', 16)} 留下第一条记忆</button>`
+              })}
+            </div>
+          </main>`;
+        renderGraph();
+      }
+
+      window.addEventListener('shiguang:change', render);
+      render();
+    })();
+  </script>
+</body>
+</html>

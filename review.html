@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>拾光AI · 周复盘</title>
+  <meta name="theme-color" content="#1e2623">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="拾光AI">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="app"></div>
+
+  <script src="mock.js"></script>
+  <script src="api.js"></script>
+  <script src="components.js"></script>
+  <script>
+    (function () {
+      const app = document.getElementById('app');
+      const DAY = 86400000;
+      let offset = 0;
+      let review = null;
+      let loading = true;
+
+      const fmtMD = (timestamp) => {
+        const date = new Date(Number(timestamp));
+        return `${String(date.getMonth() + 1).padStart(2, '0')}.${String(date.getDate()).padStart(2, '0')}`;
+      };
+
+      function weekDaily() {
+        const { start } = MemoryStore.weekRange(offset);
+        const records = MemoryStore.weekRecords(offset);
+        return Array.from({ length: 7 }, (_, index) => {
+          const from = start + index * DAY; const to = from + DAY - 1;
+          return { date: from, count: records.filter(item => item.occurredAt >= from && item.occurredAt <= to).length };
+        });
+      }
+
+      async function load() {
+        loading = true; review = null; render();
+        try { review = await MemoryAPI.review(offset); }
+        catch (error) {
+          review = MemoryStore.buildReview(offset);
+          review.warning = `复盘生成出现问题：${error.message}`;
+        }
+        loading = false; render();
+      }
+
+      function render() {
+        const { start, end } = MemoryStore.weekRange(offset);
+        const records = MemoryStore.weekRecords(offset);
+        const daily = weekDaily();
+        const max = Math.max(...daily.map(day => day.count), 1);
+
+        app.innerHTML = `
+          ${renderSidebar('review')}
+          <main class="app-main">
+            ${renderPageHeader({
+              title: '周复盘', subtitle: '把这一周的记录，变成看得见的成长',
+              actions: `
+                <div class="week-switcher">
+                  <button class="btn btn-secondary btn-icon" id="week-prev" title="上一周">${getIcon('left', 17)}</button>
+                  <strong>${fmtMD(start)} – ${fmtMD(end)}</strong>
+                  <button class="btn btn-secondary btn-icon" id="week-next" title="下一周" ${offset <= 0 ? 'disabled' : ''}>${getIcon('right', 17)}</button>
+                </div>
+                <button class="btn btn-primary" id="save-review" ${loading || !review ? 'disabled' : ''}>${getIcon('check', 16)} 保存这份复盘</button>`
+            })}
+            <div class="page-content narrow">
+              ${loading ? `<div class="loading-state card card-padded"><span class="spinner"></span>正在整理这一周…</div>` : `
+                <section class="card review-hero">
+                  <div class="review-number">WEEKLY REVIEW · ${fmtMD(start)} – ${fmtMD(end)}</div>
+                  <p class="review-summary">${SG.esc(review.summary)}</p>
+                  <div class="review-meta">共 ${records.length} 条记录 · ${review.sourceMode === 'ai' ? 'AI 增强版' : '本地统计版'} · 生成于 ${new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}</div>
+                  ${review.warning ? `<div class="notice error" style="margin-top:14px">${SG.esc(review.warning)}</div>` : ''}
+                </section>
+
+                <div class="grid-2 section">
+                  <section class="card card-padded">
+                    <div class="section-kicker">DAILY</div>
+                    <h3 class="section-title" style="font-size:17px">每日记录</h3>
+                    <div class="bar-chart">
+                      ${daily.map(day => `
+                        <div class="bar-column">
+                          <span class="bar-value">${day.count}</span>
+                          <span class="bar" style="height:${Math.max(4, Math.round(day.count / max * 120))}px"></span>
+                          <span class="bar-label">周${'一二三四五六日'[new Date(day.date).getDay() - 1] || '日'}</span>
+                        </div>`).join('')}
+                    </div>
+                  </section>
+                  <section class="card card-padded">
+                    <div class="section-kicker">HIGHLIGHTS</div>
+                    <h3 class="section-title" style="font-size:17px">本周记忆（${records.length}）</h3>
+                    <div class="review-list" style="margin-top:14px">
+                      ${records.length ? records.map((record, index) => `
+                        <div class="review-list-item" style="cursor:pointer" onclick="openRecordDetail('${record.id}')">
+                          <span>${index + 1}</span>
+                          <span>${SG.esc(record.title)}<span class="muted small" style="display:block; margin-top:2px">${SG.formatDate(record.occurredAt, false)} · ${SG.esc(record.mood)}</span></span>
+                        </div>`).join('') : '<p class="muted small">这一周还没有记录。</p>'}
+                    </div>
+                  </section>
+                </div>
+
+                <div class="grid-3 section">
+                  ${reviewSection('值得肯定', 'WINS', review.wins)}
+                  ${reviewSection('可以改进', 'CHALLENGES', review.challenges)}
+                  ${reviewSection('下周行动', 'NEXT STEPS', review.nextSteps)}
+                </div>
+
+                <section class="section">
+                  <div class="section-head">
+                    <div><div class="section-kicker">ARCHIVE</div><h2 class="section-title">过往复盘</h2></div>
+                  </div>
+                  ${pastReviewsHTML()}
+                </section>`}
+            </div>
+          </main>`;
+
+        document.getElementById('week-prev').onclick = () => { offset += 1; load(); };
+        document.getElementById('week-next')?.addEventListener('click', () => {
+          if (offset > 0) { offset -= 1; load(); }
+        });
+        const saveButton = document.getElementById('save-review');
+        if (saveButton && review) saveButton.onclick = () => {
+          MemoryStore.saveReview({ ...review });
+          showToast('这份复盘已存入档案', 'success');
+          render();
+        };
+        app.querySelectorAll('[data-week]').forEach(btn => {
+          btn.onclick = () => { offset = Number(btn.dataset.week); load(); };
+        });
+      }
+
+      function reviewSection(title, kicker, items) {
+        return `<section class="card card-padded">
+          <div class="section-kicker">${kicker}</div>
+          <h3 class="section-title" style="font-size:17px">${title}</h3>
+          <div class="review-list" style="margin-top:14px">
+            ${(items || []).map((text, index) => `<div class="review-list-item"><span>${index + 1}</span><span>${SG.esc(text)}</span></div>`).join('') || '<p class="muted small">暂无内容。</p>'}
+          </div>
+        </section>`;
+      }
+
+      function pastReviewsHTML() {
+        const saved = MemoryStore.listReviews();
+        if (!saved.length) return `<p class="muted small">还没有保存过复盘。点击右上角「保存这份复盘」，把它放进档案。</p>`;
+        const thisMonday = MemoryStore.weekRange(0).start;
+        return `<div class="stack">${saved.map(savedReview => {
+          const diff = Math.round((thisMonday - savedReview.weekStart) / (7 * DAY));
+          return `<div class="card card-padded row spread wrap">
+            <div style="min-width:0; flex:1">
+              <div class="section-kicker">WEEK ${fmtMD(savedReview.weekStart)} – ${fmtMD(savedReview.weekEnd)}</div>
+              <p class="small soft" style="margin-top:4px">${SG.esc(savedReview.summary.slice(0, 120))}${savedReview.summary.length > 120 ? '…' : ''}</p>
+            </div>
+            ${diff >= 0 && diff <= 52 ? `<button class="btn btn-secondary btn-sm" data-week="${diff}">${getIcon('clock', 14)} 查看该周</button>` : ''}
+          </div>`;
+        }).join('')}</div>`;
+      }
+
+      load();
+    })();
+  </script>
+</body>
+</html>

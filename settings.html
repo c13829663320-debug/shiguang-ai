@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>拾光AI · 设置</title>
+  <meta name="theme-color" content="#1e2623">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="拾光AI">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="app"></div>
+
+  <script src="mock.js"></script>
+  <script src="api.js"></script>
+  <script src="components.js"></script>
+  <script>
+    (function () {
+      const app = document.getElementById('app');
+      let section = 'profile';
+      const SECTIONS = [
+        ['profile', 'smile', '个人资料'],
+        ['ai', 'sparkles', 'AI 连接'],
+        ['memory', 'brain', '记忆偏好'],
+        ['data', 'shield', '数据管理'],
+        ['about', 'info', '关于']
+      ];
+
+      const settingRow = (name, key, note) => `
+        <div class="setting-row">
+          <div><div class="setting-name">${name}</div><div class="setting-note">${note}</div></div>
+          <button class="switch ${MemoryStore.settings()[key] ? 'active' : ''}" data-toggle="${key}" role="switch"></button>
+        </div>`;
+
+      function render() {
+        app.innerHTML = `
+          ${renderSidebar('settings')}
+          <main class="app-main">
+            ${renderPageHeader({ title: '设置', subtitle: '偏好、AI 连接与数据，全部由你掌控' })}
+            <div class="page-content narrow">
+              <div class="settings-layout">
+                <nav class="settings-nav">
+                  ${SECTIONS.map(([key, icon, label]) => `<button class="${section === key ? 'active' : ''}" data-section="${key}">${getIcon(icon, 15)} ${label}</button>`).join('')}
+                </nav>
+                <div id="settings-body">${sectionHTML()}</div>
+              </div>
+            </div>
+          </main>`;
+        app.querySelectorAll('[data-section]').forEach(btn => {
+          btn.onclick = () => { section = btn.dataset.section; render(); };
+        });
+        bindSection();
+      }
+
+      function sectionHTML() {
+        const settings = MemoryStore.settings();
+        if (section === 'profile') return `
+          <div class="card settings-section">
+            <h2 class="settings-title">个人资料</h2>
+            <p class="settings-desc">称呼会出现在工作台的问候与记忆助手中。</p>
+            <div class="form-stack">
+              <div class="field">
+                <label class="field-label" for="set-name">我的称呼</label>
+                <input class="input" id="set-name" maxlength="16" value="${SG.esc(settings.name)}" placeholder="怎么称呼你">
+              </div>
+              <div class="row"><button class="btn btn-primary" id="save-profile">${getIcon('check', 15)} 保存</button></div>
+            </div>
+          </div>`;
+        if (section === 'ai') return `
+          <div class="card settings-section">
+            <h2 class="settings-title">AI 连接（可选）</h2>
+            <p class="settings-desc">不配置也能完整使用：助手与复盘会使用本地检索。接入 OpenAI 兼容接口（如 OpenRouter）后可获得生成式回答。</p>
+            <div class="setting-row">
+              <div><div class="setting-name">启用 AI 增强</div><div class="setting-note">关闭后，问答与复盘完全离线运行。</div></div>
+              <button class="switch ${settings.aiEnabled ? 'active' : ''}" data-toggle="aiEnabled" role="switch"></button>
+            </div>
+            <div class="form-stack" style="margin-top:18px">
+              <div class="field">
+                <label class="field-label" for="set-endpoint">API 地址</label>
+                <input class="input" id="set-endpoint" value="${SG.esc(settings.apiEndpoint)}" placeholder="https://openrouter.ai/api/v1/chat/completions">
+              </div>
+              <div class="field">
+                <label class="field-label" for="set-model">模型</label>
+                <input class="input" id="set-model" value="${SG.esc(settings.model)}" placeholder="openai/gpt-4o-mini">
+                <span class="field-hint">OpenRouter 模型 ID，或其他 OpenAI 兼容服务的模型名。</span>
+              </div>
+              <div class="field">
+                <label class="field-label" for="set-key">API 密钥</label>
+                <input class="input" id="set-key" type="password" value="${SG.esc(settings.apiKey)}" placeholder="sk-…">
+                <span class="field-hint">仅保存在此浏览器；导出备份时自动剔除。</span>
+              </div>
+              <div class="row wrap">
+                <button class="btn btn-primary" id="save-ai">${getIcon('check', 15)} 保存连接</button>
+                <button class="btn btn-secondary" id="test-ai">${getIcon('send', 15)} 测试连接</button>
+              </div>
+            </div>
+            <div class="notice" style="margin-top:18px">${getIcon('shield', 15)}<span>密钥与请求都只发生在你的浏览器与服务商之间，拾光AI 本身不经过任何服务器。</span></div>
+          </div>`;
+        if (section === 'memory') return `
+          <div class="card settings-section">
+            <h2 class="settings-title">记忆偏好</h2>
+            <p class="settings-desc">这些小习惯会让记忆库更好用。</p>
+            ${settingRow('自动整理', 'autoOrganize', '保存时自动截取标题、去重标签。')}
+            ${settingRow('每日回顾提醒', 'reminder', '打开工作台时，自动提醒你回顾一条旧记忆。')}
+            ${settingRow('减少动效', 'reduceMotion', '关闭卡片悬浮、弹窗动画等效果。')}
+            <div class="setting-row">
+              <div><div class="setting-name">标签管理</div><div class="setting-note">重命名、合并或删除标签，相关记忆会同步更新。</div></div>
+              <button class="btn btn-secondary btn-sm" id="open-tag-manager">管理标签</button>
+            </div>
+          </div>`;
+        if (section === 'data') return `
+          <div class="card settings-section">
+            <h2 class="settings-title">数据管理</h2>
+            <p class="settings-desc">记忆默认只保存在此浏览器，请定期导出备份。</p>
+            <div class="row wrap" style="margin-bottom:8px">
+              <button class="btn btn-secondary" id="export-json">${getIcon('download', 15)} 导出 JSON 备份</button>
+              <button class="btn btn-secondary" id="export-md">${getIcon('download', 15)} 导出 Markdown</button>
+            </div>
+            <div class="row wrap" style="margin:10px 0 4px">
+              <button class="btn btn-secondary" id="import-merge">${getIcon('upload', 15)} 导入（合并）</button>
+              <button class="btn btn-secondary" id="import-replace">${getIcon('upload', 15)} 导入（覆盖）</button>
+              <input type="file" id="import-input" accept="application/json,.json" hidden>
+            </div>
+            <div class="setting-row">
+              <div><div class="setting-name">恢复示例数据</div><div class="setting-note">保留当前设置，重新载入示例记忆。</div></div>
+              <button class="btn btn-secondary btn-sm" id="reset-demo">恢复</button>
+            </div>
+            <div class="setting-row">
+              <div><div class="setting-name" style="color:var(--danger)">清空全部数据</div><div class="setting-note">删除所有记忆、复盘与问答记录，此操作不可撤销。</div></div>
+              <button class="btn btn-danger btn-sm" id="clear-all">清空</button>
+            </div>
+          </div>`;
+        return `
+          <div class="card settings-section">
+            <h2 class="settings-title">关于拾光AI</h2>
+            <p class="settings-desc">MEMORY, MADE VISIBLE · 让记忆可见。</p>
+            <p class="soft small" style="line-height:2">拾光AI 是一个本地优先的个人记忆原型：随手记录、自动归档、随时找回、每周复盘。所有数据默认只保存在此浏览器，随时可导出带走。接入 AI 后，回答也只依据你自己保存的记录生成。</p>
+            <div class="setting-row">
+              <div><div class="setting-name">安装到桌面</div><div class="setting-note">作为独立应用打开，离线也能记录与回顾。</div></div>
+              <button class="btn btn-secondary btn-sm" id="install-app">安装应用</button>
+            </div>
+            <div class="divider"></div>
+            <div class="row wrap">
+              <span class="badge">纯静态原型</span><span class="badge">零依赖</span>
+              <span class="badge">本地优先</span><span class="badge">v2.0</span>
+            </div>
+          </div>`;
+      }
+
+      function bindSection() {
+        app.querySelectorAll('[data-toggle]').forEach(el => {
+          el.onclick = () => {
+            const key = el.dataset.toggle;
+            const next = MemoryStore.updateSettings({ [key]: !MemoryStore.settings()[key] });
+            el.classList.toggle('active', next[key]);
+            if (key === 'reduceMotion') document.body.classList.toggle('reduce-motion', next[key]);
+          };
+        });
+        const on = (id, handler) => { const el = document.getElementById(id); if (el) el.onclick = handler; };
+
+        on('open-tag-manager', () => openTagManager());
+
+        const installButton = document.getElementById('install-app');
+        if (installButton) {
+          if (window.isAppInstalled && window.isAppInstalled()) { installButton.textContent = '已安装'; installButton.disabled = true; }
+          installButton.onclick = async () => {
+            const result = await window.installApp();
+            if (result === 'installed') { installButton.textContent = '已安装'; installButton.disabled = true; }
+            else if (result === 'dismissed') showToast('已取消安装', 'info');
+            else showToast('当前浏览器未提供安装入口，可在浏览器菜单中选择「安装应用」或「添加到主屏幕」。', 'info', 6000);
+          };
+        }
+
+        on('save-profile', () => {
+          const name = document.getElementById('set-name').value.trim() || '我的朋友';
+          MemoryStore.updateSettings({ name });
+          refreshProfile(name);
+          showToast('称呼已更新', 'success');
+        });
+        on('save-ai', () => {
+          MemoryStore.updateSettings({
+            apiEndpoint: document.getElementById('set-endpoint').value.trim(),
+            model: document.getElementById('set-model').value.trim(),
+            apiKey: document.getElementById('set-key').value.trim()
+          });
+          showToast('AI 连接设置已保存', 'success');
+        });
+        on('test-ai', async () => {
+          const button = document.getElementById('test-ai');
+          button.disabled = true; button.textContent = '测试中…';
+          try {
+            MemoryStore.updateSettings({
+              apiEndpoint: document.getElementById('set-endpoint').value.trim(),
+              model: document.getElementById('set-model').value.trim(),
+              apiKey: document.getElementById('set-key').value.trim()
+            });
+            await MemoryAPI.testConnection();
+            showToast('连接成功，AI 增强已就绪', 'success', 5000);
+          } catch (error) {
+            showToast(`连接失败：${error.message}`, 'error', 6000);
+          } finally {
+            button.disabled = false; button.innerHTML = `${getIcon('send', 15)} 测试连接`;
+          }
+        });
+        on('export-json', () => {
+          SG.download(`拾光AI-备份-${new Date().toISOString().slice(0, 10)}.json`, MemoryStore.exportJSON());
+          showToast('已导出 JSON 备份（不含密钥）', 'success');
+        });
+        on('export-md', () => {
+          SG.download(`拾光AI-记忆-${new Date().toISOString().slice(0, 10)}.md`, MemoryStore.exportMarkdown());
+          showToast('已导出 Markdown 档案', 'success');
+        });
+        let importMode = 'merge';
+        on('import-merge', () => { importMode = 'merge'; document.getElementById('import-input').click(); });
+        on('import-replace', () => { importMode = 'replace'; document.getElementById('import-input').click(); });
+        const importInput = document.getElementById('import-input');
+        if (importInput) importInput.onchange = event => {
+          const file = event.target.files[0]; if (!file) return;
+          const reader = new FileReader();
+          reader.onload = () => {
+            try {
+              const count = MemoryStore.importJSON(String(reader.result), importMode);
+              showToast(`已导入 ${count} 条记忆`, 'success', 5000);
+            } catch (error) { showToast(error.message, 'error', 6000); }
+          };
+          reader.onerror = () => showToast('读取备份文件失败。', 'error');
+          reader.readAsText(file);
+          importInput.value = '';
+        };
+        on('reset-demo', () => showConfirm({
+          title: '恢复示例数据？', message: '将重新载入示例记忆，你新建的记忆会保留。',
+          confirmText: '恢复示例', danger: false,
+          onConfirm: () => { MemoryStore.resetDemo(); showToast('示例数据已恢复', 'success'); }
+        }));
+        on('clear-all', () => showConfirm({
+          title: '清空全部数据？', message: '所有记忆、复盘与问答记录将被永久删除，且无法恢复。建议先导出备份。',
+          confirmText: '全部清空',
+          onConfirm: () => { MemoryStore.clearAll(); showToast('已清空，随时可以重新开始', 'success'); }
+        }));
+      }
+
+      function refreshProfile(name) {
+        const nameEl = document.querySelector('.profile-name');
+        if (nameEl) nameEl.textContent = name;
+        const avatar = document.querySelector('.profile-avatar');
+        if (avatar) avatar.textContent = name.slice(0, 1);
+      }
+
+      render();
+    })();
+  </script>
+</body>
+</html>
