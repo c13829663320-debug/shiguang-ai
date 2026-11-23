@@ -86,7 +86,51 @@
       reader.readAsDataURL(file);
     });
   }
-  window.SG = { esc, typeMap, formatDate, formatTime, relativeTime, fileSize, download, fileToAttachment };
+  // 轻量 Markdown 渲染：只支持标题、强调、列表、引用、代码、链接与分割线，先转义再拼接，避免注入。
+  function renderMarkdown(text) {
+    const inline = (value) => esc(value)
+      .replace(/`([^`\n]+)`/g, '<code>$1</code>')
+      .replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>')
+      .replace(/~~([^~\n]+)~~/g, '<del>$1</del>')
+      .replace(/(^|[^*])\*([^*\n]+)\*(?!\*)/g, '$1<em>$2</em>')
+      .replace(/\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>')
+      .replace(/(^|[\s（(])(https?:\/\/[^\s<）)]+)/g, '$1<a href="$2" target="_blank" rel="noopener noreferrer">$2</a>')
+      .replace(/\n/g, '<br>');
+    const lines = String(text || '').replace(/\r\n?/g, '\n').split('\n');
+    const out = [];
+    const code = [];
+    let paragraph = [];
+    let quote = [];
+    let list = '';
+    let inCode = false;
+    const flushParagraph = () => { if (paragraph.length) { out.push(`<p>${inline(paragraph.join('\n'))}</p>`); paragraph = []; } };
+    const flushQuote = () => { if (quote.length) { out.push(`<blockquote>${inline(quote.join('\n'))}</blockquote>`); quote = []; } };
+    const closeList = () => { if (list) { out.push(`</${list}>`); list = ''; } };
+    lines.forEach(raw => {
+      const line = raw.replace(/\s+$/, '');
+      if (inCode) {
+        if (/^```/.test(line.trim())) { out.push(`<pre><code>${esc(code.join('\n'))}</code></pre>`); code.length = 0; inCode = false; } else code.push(raw);
+        return;
+      }
+      if (/^```/.test(line.trim())) { flushParagraph(); flushQuote(); closeList(); inCode = true; return; }
+      if (!line.trim()) { flushParagraph(); flushQuote(); closeList(); return; }
+      const heading = line.match(/^(#{1,6})\s+(.+)$/);
+      if (heading) { flushParagraph(); flushQuote(); closeList(); const level = Math.min(heading[1].length + 3, 6); out.push(`<h${level}>${inline(heading[2])}</h${level}>`); return; }
+      if (/^([-*_])\1{2,}$/.test(line.trim())) { flushParagraph(); flushQuote(); closeList(); out.push('<hr>'); return; }
+      const quoted = line.match(/^>\s?(.*)$/);
+      if (quoted) { flushParagraph(); closeList(); quote.push(quoted[1]); return; }
+      const bullet = line.match(/^[-*+]\s+(.+)$/);
+      if (bullet) { flushParagraph(); flushQuote(); if (list !== 'ul') { closeList(); out.push('<ul>'); list = 'ul'; } out.push(`<li>${inline(bullet[1])}</li>`); return; }
+      const ordered = line.match(/^\d+[.)]\s+(.+)$/);
+      if (ordered) { flushParagraph(); flushQuote(); if (list !== 'ol') { closeList(); out.push('<ol>'); list = 'ol'; } out.push(`<li>${inline(ordered[1])}</li>`); return; }
+      flushQuote(); closeList(); paragraph.push(line.trim());
+    });
+    if (inCode) out.push(`<pre><code>${esc(code.join('\n'))}</code></pre>`);
+    flushParagraph(); flushQuote(); closeList();
+    return out.join('');
+  }
+
+  window.SG = { esc, typeMap, formatDate, formatTime, relativeTime, fileSize, download, fileToAttachment, markdown: renderMarkdown };
 
   const applyTheme = (theme) => {
     const dark = theme === 'dark';
@@ -274,7 +318,7 @@
     const related = MemoryStore.relatedRecords(id, 3);
     const relatedHTML = related.length ? `<div class="related-block"><div class="related-title">${getIcon('link', 14)} 相关记忆</div><div class="related-list">${related.map(item => `<button class="related-item" data-related="${item.id}"><span class="related-item-title">${esc(item.title)}</span><span class="related-item-meta">${formatDate(item.occurredAt, false)} · ${item.sharedTags.length ? `共同标签：${item.sharedTags.map(esc).join('、')}` : '内容相近'}</span></button>`).join('')}</div></div>` : '';
     const overlay = document.createElement('div'); overlay.className = 'modal-overlay';
-    overlay.innerHTML = `<div class="modal modal-lg" role="dialog" aria-modal="true"><div class="modal-header"><div><span class="memory-type">${getIcon(icon, 14)} ${type}</span><h3 class="modal-title" style="margin-top:7px">${esc(record.title)}</h3></div><button class="btn btn-ghost btn-icon" data-close>${getIcon('x')}</button></div><div class="modal-body"><div class="detail-meta"><span>${getIcon('calendar', 13)} ${formatDate(record.occurredAt)} ${formatTime(record.occurredAt)}</span><span>${getIcon('smile', 13)} ${esc(record.mood)}</span><span>${esc(record.source)}</span></div><div class="memory-tags" style="margin-bottom:18px">${record.tags.map(tag => `<span class="tag tag-teal">${esc(tag)}</span>`).join('')}</div><div class="detail-content">${esc(record.content || '这条记忆只有附件，没有文字描述。')}</div>${record.attachments.map(attachmentHTML).join('')}${relatedHTML}</div><div class="modal-footer detail-footer" style="justify-content:space-between"><div class="row"><button class="btn btn-ghost btn-sm" id="detail-pin">${getIcon('pin', 15)} ${record.pinned ? '取消置顶' : '置顶'}</button><button class="btn btn-ghost btn-sm" id="detail-delete">${getIcon('trash', 15)} 删除</button></div><div class="row"><button class="btn btn-secondary btn-sm" id="detail-share">${getIcon('image', 15)} 分享卡片</button><button class="btn btn-dark" id="detail-edit">${getIcon('edit', 15)} 编辑记忆</button></div></div></div>`;
+    overlay.innerHTML = `<div class="modal modal-lg" role="dialog" aria-modal="true"><div class="modal-header"><div><span class="memory-type">${getIcon(icon, 14)} ${type}</span><h3 class="modal-title" style="margin-top:7px">${esc(record.title)}</h3></div><button class="btn btn-ghost btn-icon" data-close>${getIcon('x')}</button></div><div class="modal-body"><div class="detail-meta"><span>${getIcon('calendar', 13)} ${formatDate(record.occurredAt)} ${formatTime(record.occurredAt)}</span><span>${getIcon('smile', 13)} ${esc(record.mood)}</span><span>${esc(record.source)}</span></div><div class="memory-tags" style="margin-bottom:18px">${record.tags.map(tag => `<span class="tag tag-teal">${esc(tag)}</span>`).join('')}</div><div class="detail-content">${renderMarkdown(record.content || '这条记忆只有附件，没有文字描述。')}</div>${record.attachments.map(attachmentHTML).join('')}${relatedHTML}</div><div class="modal-footer detail-footer" style="justify-content:space-between"><div class="row"><button class="btn btn-ghost btn-sm" id="detail-pin">${getIcon('pin', 15)} ${record.pinned ? '取消置顶' : '置顶'}</button><button class="btn btn-ghost btn-sm" id="detail-delete">${getIcon('trash', 15)} 删除</button></div><div class="row"><button class="btn btn-secondary btn-sm" id="detail-share">${getIcon('image', 15)} 分享卡片</button><button class="btn btn-dark" id="detail-edit">${getIcon('edit', 15)} 编辑记忆</button></div></div></div>`;
     document.body.appendChild(overlay);
     overlay.querySelector('[data-close]').onclick = () => overlay.remove();
     overlay.querySelectorAll('[data-related]').forEach(btn => btn.onclick = () => { const nextId = btn.dataset.related; overlay.remove(); openRecordDetail(nextId); });
@@ -373,7 +417,7 @@
     if (!record) { showToast('还没有可以回顾的旧记忆，再多记录几天吧。', 'info'); return; }
     const [type, icon] = typeMap[record.type] || typeMap.text;
     const overlay = document.createElement('div'); overlay.className = 'modal-overlay';
-    overlay.innerHTML = `<div class="modal modal-review" role="dialog" aria-modal="true"><div class="modal-header"><div><span class="review-kicker">${getIcon('sparkles', 14)} DAILY REVIEW · 每日回顾</span><h3 class="modal-title" style="margin-top:8px">${esc(record.title)}</h3></div><button class="btn btn-ghost btn-icon" data-close>${getIcon('x')}</button></div><div class="modal-body"><div class="detail-meta"><span>${getIcon('calendar', 13)} ${formatDate(record.occurredAt)}</span><span>${getIcon(icon, 13)} ${type}</span><span>${getIcon('smile', 13)} ${esc(record.mood)}</span></div><p class="review-lead">偶然翻到这一条，也许值得再读一遍。</p><div class="detail-content">${esc(record.content || '这条记忆只有附件，没有文字描述。')}</div><div class="memory-tags" style="margin-top:18px">${record.tags.map(tag => `<span class="tag tag-teal">${esc(tag)}</span>`).join('')}</div><button class="btn btn-ghost btn-sm" id="review-open-detail" style="margin-top:14px">${getIcon('external', 14)} 打开完整记忆</button></div><div class="modal-footer"><button class="btn btn-secondary" data-close>稍后</button><button class="btn btn-primary" id="review-done">${getIcon('check', 16)} 记住了</button></div></div>`;
+    overlay.innerHTML = `<div class="modal modal-review" role="dialog" aria-modal="true"><div class="modal-header"><div><span class="review-kicker">${getIcon('sparkles', 14)} DAILY REVIEW · 每日回顾</span><h3 class="modal-title" style="margin-top:8px">${esc(record.title)}</h3></div><button class="btn btn-ghost btn-icon" data-close>${getIcon('x')}</button></div><div class="modal-body"><div class="detail-meta"><span>${getIcon('calendar', 13)} ${formatDate(record.occurredAt)}</span><span>${getIcon(icon, 13)} ${type}</span><span>${getIcon('smile', 13)} ${esc(record.mood)}</span></div><p class="review-lead">偶然翻到这一条，也许值得再读一遍。</p><div class="detail-content">${renderMarkdown(record.content || '这条记忆只有附件，没有文字描述。')}</div><div class="memory-tags" style="margin-top:18px">${record.tags.map(tag => `<span class="tag tag-teal">${esc(tag)}</span>`).join('')}</div><button class="btn btn-ghost btn-sm" id="review-open-detail" style="margin-top:14px">${getIcon('external', 14)} 打开完整记忆</button></div><div class="modal-footer"><button class="btn btn-secondary" data-close>稍后</button><button class="btn btn-primary" id="review-done">${getIcon('check', 16)} 记住了</button></div></div>`;
     document.body.appendChild(overlay);
     overlay.querySelectorAll('[data-close]').forEach(btn => btn.onclick = () => overlay.remove());
     overlay.querySelector('#review-open-detail').onclick = () => { overlay.remove(); openRecordDetail(record.id); };

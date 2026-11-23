@@ -454,7 +454,26 @@ svg { flex: 0 0 auto; }
 .modal-title { font: 700 20px var(--serif); }
 .modal-body { padding: 24px; }
 .modal-footer { display: flex; align-items: center; justify-content: flex-end; gap: 10px; padding: 16px 24px; border-top: 1px solid var(--line); }
-.detail-content { color: var(--ink-soft); font: 15px/2 var(--serif); white-space: pre-wrap; word-break: break-word; }
+.detail-content { color: var(--ink-soft); font: 15px/2 var(--serif); word-break: break-word; }
+.detail-content > :first-child { margin-top: 0; }
+.detail-content > :last-child { margin-bottom: 0; }
+.detail-content p { margin: 0 0 14px; }
+.detail-content h4, .detail-content h5, .detail-content h6 { margin: 24px 0 10px; color: var(--ink); font-family: var(--serif); font-weight: 700; line-height: 1.5; }
+.detail-content h4 { font-size: 20px; }
+.detail-content h5 { font-size: 17px; }
+.detail-content h6 { font-size: 14px; letter-spacing: .04em; }
+.detail-content ul, .detail-content ol { margin: 0 0 14px; padding-left: 24px; }
+.detail-content li { margin: 4px 0; }
+.detail-content li::marker { color: var(--coral); }
+.detail-content blockquote { margin: 0 0 14px; padding: 10px 16px; border-left: 3px solid var(--gold); border-radius: 0 8px 8px 0; background: var(--gold-soft); color: var(--ink-soft); }
+.detail-content code { padding: 1px 5px; border-radius: 4px; background: var(--paper-deep); color: var(--coral-dark); font: 12.5px/1.6 var(--mono); }
+.detail-content pre { margin: 0 0 16px; padding: 14px 16px; overflow: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--paper-deep); }
+.detail-content pre code { padding: 0; background: none; color: var(--ink-soft); font-size: 12.5px; }
+.detail-content a { color: var(--teal); text-decoration: underline; text-underline-offset: 2px; }
+.detail-content a:hover { color: var(--coral-dark); }
+.detail-content hr { margin: 20px 0; border: 0; border-top: 1px solid var(--line); }
+.detail-content strong { color: var(--ink); }
+.detail-content del { color: var(--muted); }
 .detail-meta { display: flex; gap: 12px; margin: 14px 0 22px; color: var(--muted); font-size: 11px; flex-wrap: wrap; }
 .related-block { margin-top: 26px; padding-top: 18px; border-top: 1px solid var(--line); }
 .related-title { display: flex; align-items: center; gap: 6px; margin-bottom: 10px; color: var(--teal); font-size: 11px; font-weight: 700; letter-spacing: .06em; }
