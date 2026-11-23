@@ -436,6 +436,12 @@ svg { flex: 0 0 auto; }
 .command-input { flex: 1; border: 0; background: transparent; color: var(--ink); font-size: 14px; outline: 0; }
 .command-input::placeholder { color: #a8aaa4; }
 .command-hint { padding: 2px 7px; border: 1px solid var(--line); border-radius: 5px; color: var(--muted); font: 9px var(--mono); }
+.command-recents { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 18px 12px; }
+.command-recents[hidden] { display: none; }
+.command-recent { display: inline-flex; align-items: center; gap: 5px; padding: 5px 10px; border: 1px solid var(--line); border-radius: 999px; background: transparent; color: var(--ink-soft); font-size: 11px; }
+.command-recent:hover { border-color: var(--teal); color: var(--teal); }
+.command-recent svg { opacity: .7; }
+.command-item .search-hit { background: rgba(214, 168, 75, .35); }
 .command-results { max-height: min(52vh, 420px); overflow: auto; padding: 8px; }
 .command-group { padding: 10px 8px 5px; color: var(--muted); font-size: 10px; letter-spacing: .1em; }
 .command-item { display: flex; align-items: center; gap: 10px; width: 100%; padding: 9px 10px; border-radius: 9px; color: var(--ink-soft); text-align: left; }

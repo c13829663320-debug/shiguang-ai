@@ -241,15 +241,18 @@
     if (paletteOpen) return;
     paletteOpen = true;
     const overlay = document.createElement('div'); overlay.className = 'command-overlay';
-    overlay.innerHTML = `<div class="command-panel" role="dialog" aria-modal="true" aria-label="快捷搜索"><div class="command-input-row">${getIcon('search', 18)}<input class="command-input" id="command-input" placeholder="搜索记忆、页面，或直接记录此刻…" autocomplete="off"><span class="command-hint">ESC</span></div><div class="command-results" id="command-results"></div><div class="command-foot"><span>${getIcon('right', 11)} 选择</span><span>Enter 打开</span><span>Esc 关闭</span></div></div>`;
+    overlay.innerHTML = `<div class="command-panel" role="dialog" aria-modal="true" aria-label="快捷搜索"><div class="command-input-row">${getIcon('search', 18)}<input class="command-input" id="command-input" placeholder="搜索记忆、页面，或直接记录此刻…" autocomplete="off"><span class="command-hint">ESC</span></div><div class="command-recents" id="command-recents"></div><div class="command-results" id="command-results"></div><div class="command-foot"><span>${getIcon('right', 11)} 选择</span><span>Enter 打开</span><span>Esc 关闭</span></div></div>`;
     document.body.appendChild(overlay);
     const input = overlay.querySelector('#command-input');
+    const recents = overlay.querySelector('#command-recents');
     const results = overlay.querySelector('#command-results');
     let items = []; let active = 0;
 
     const close = () => { paletteOpen = false; overlay.remove(); document.removeEventListener('keydown', onKey, true); };
     const run = item => {
       if (!item) return;
+      const query = input.value.trim();
+      if (query) SG.rememberSearch(query);
       close();
       if (item.kind === 'record') window.openRecordDetail(item.id);
       else if (item.kind === 'action') window.openRecordEditor();
@@ -259,18 +262,23 @@
       results.querySelectorAll('.command-item').forEach(btn => btn.classList.toggle('active', Number(btn.dataset.index) === active));
       results.querySelector('.command-item.active')?.scrollIntoView({ block: 'nearest' });
     };
+    const paintRecents = query => {
+      const list = query ? [] : SG.searchHistoryList();
+      recents.innerHTML = list.map(item => `<button class="command-recent" data-recent="${esc(item)}">${getIcon('clock', 11)}${esc(item)}</button>`).join('');
+      recents.hidden = !list.length;
+    };
     const paint = raw => {
       const query = raw.trim();
       const records = MemoryStore.listRecords(query ? { query } : {}).slice(0, query ? 6 : 4);
       const pages = PAGES.filter(page => !query || `${page[0]} ${page[3]}`.toLowerCase().includes(query.toLowerCase()));
       items = [
         ...records.map(record => ({
-          kind: 'record', id: record.id, title: record.title, icon: (typeMap[record.type] || typeMap.text)[1],
+          kind: 'record', id: record.id, title: record.title, titleHTML: highlight(record.title, query), icon: (typeMap[record.type] || typeMap.text)[1],
           meta: `${formatDate(record.occurredAt)}${record.tags.length ? ' · ' + record.tags.slice(0, 2).join('、') : ''}`,
           group: query ? '相关记忆' : '最近的记忆'
         })),
         ...(query ? [] : [{ kind: 'action', title: '留下此刻（新建记忆）', meta: '快速记录', icon: 'plus', group: '操作' }]),
-        ...pages.map(page => ({ kind: 'page', href: page[1], title: page[0], meta: '页面跳转', icon: page[2], group: '页面' }))
+        ...pages.map(page => ({ kind: 'page', href: page[1], title: page[0], titleHTML: highlight(page[0], query), meta: '页面跳转', icon: page[2], group: '页面' }))
       ];
       active = 0;
       if (!items.length) { results.innerHTML = `<div class="command-empty">没有找到与「${esc(query)}」相关的记忆或页面。</div>`; return; }
@@ -278,7 +286,7 @@
       results.innerHTML = items.map((item, index) => {
         const header = item.group !== lastGroup ? `<div class="command-group">${item.group}</div>` : '';
         lastGroup = item.group;
-        return `${header}<button class="command-item" data-index="${index}">${getIcon(item.icon, 16)}<span class="command-item-text"><span class="command-item-title">${esc(item.title)}</span><span class="command-item-meta">${esc(item.meta)}</span></span>${getIcon(item.kind === 'page' ? 'external' : 'right', 13)}</button>`;
+        return `${header}<button class="command-item" data-index="${index}">${getIcon(item.icon, 16)}<span class="command-item-text"><span class="command-item-title">${item.titleHTML ?? esc(item.title)}</span><span class="command-item-meta">${esc(item.meta)}</span></span>${getIcon(item.kind === 'page' ? 'external' : 'right', 13)}</button>`;
       }).join('');
       paintActive();
     };
@@ -290,11 +298,17 @@
       else if (event.key === 'Enter') { event.preventDefault(); run(items[active]); }
     };
 
-    input.addEventListener('input', event => paint(event.target.value));
+    input.addEventListener('input', event => { paintRecents(event.target.value.trim()); paint(event.target.value); });
+    recents.addEventListener('click', event => {
+      const btn = event.target.closest('[data-recent]'); if (!btn) return;
+      const value = btn.dataset.recent;
+      input.value = value; paintRecents(value); paint(value); input.focus();
+    });
     results.addEventListener('click', event => { const btn = event.target.closest('[data-index]'); if (btn) run(items[Number(btn.dataset.index)]); });
     results.addEventListener('mouseover', event => { const btn = event.target.closest('[data-index]'); if (btn) { active = Number(btn.dataset.index); paintActive(); } });
     overlay.addEventListener('click', event => { if (event.target === overlay) close(); });
     document.addEventListener('keydown', onKey, true);
+    paintRecents('');
     paint('');
     input.focus();
   };
