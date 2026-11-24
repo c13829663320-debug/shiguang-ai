@@ -534,6 +534,9 @@ a.heatmap-cell:hover { transform: translateY(-1px); box-shadow: 0 0 0 1.5px var(
 .detail-content strong { color: var(--ink); }
 .detail-content del { color: var(--muted); }
 .detail-meta { display: flex; gap: 12px; margin: 14px 0 22px; color: var(--muted); font-size: 11px; flex-wrap: wrap; }
+.detail-nav { display: flex; align-items: center; gap: 1px; flex-shrink: 0; }
+.detail-nav .btn[disabled] { opacity: .35; cursor: default; }
+.detail-position { min-width: 34px; color: var(--muted); font: 10px var(--mono); text-align: center; letter-spacing: .04em; }
 .related-block { margin-top: 26px; padding-top: 18px; border-top: 1px solid var(--line); }
 .related-title { display: flex; align-items: center; gap: 6px; margin-bottom: 10px; color: var(--teal); font-size: 11px; font-weight: 700; letter-spacing: .06em; }
 .related-list { display: flex; flex-direction: column; gap: 7px; }

@@ -1,5 +1,5 @@
 /* 拾光AI：离线缓存。页面走网络优先，静态资源走缓存优先并在后台更新。 */
-const CACHE = 'shiguang-ai-v8';
+const CACHE = 'shiguang-ai-v9';
 const ASSETS = [
   './', './index.html', './history.html', './assistant.html', './review.html',
   './files.html', './settings.html', './insights.html', './annual.html',

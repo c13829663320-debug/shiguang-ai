@@ -384,16 +384,37 @@
     const record = MemoryStore.getRecord(id); if (!record) { showToast('这条记忆不存在或已删除。', 'error'); return; }
     const [type, icon] = typeMap[record.type] || typeMap.text;
     const related = MemoryStore.relatedRecords(id, 3);
+    // 连续浏览：按时间倒序取相邻记录，← 看更早一条，→ 看更新一条。
+    const timeline = MemoryStore.listRecords().sort((a, b) => b.occurredAt - a.occurredAt);
+    const index = timeline.findIndex(item => item.id === id);
+    const earlier = index >= 0 && index < timeline.length - 1 ? timeline[index + 1] : null;
+    const later = index > 0 ? timeline[index - 1] : null;
+    const navHTML = timeline.length > 1 ? `<div class="detail-nav">
+      <button class="btn btn-ghost btn-icon btn-sm" id="detail-prev" title="上一条（更早，←）" aria-label="上一条记忆" ${earlier ? '' : 'disabled'}>${getIcon('left', 15)}</button>
+      <span class="detail-position">${index >= 0 ? index + 1 : '-'} / ${timeline.length}</span>
+      <button class="btn btn-ghost btn-icon btn-sm" id="detail-next" title="下一条（更新，→）" aria-label="下一条记忆" ${later ? '' : 'disabled'}>${getIcon('right', 15)}</button>
+    </div>` : '';
     const relatedHTML = related.length ? `<div class="related-block"><div class="related-title">${getIcon('link', 14)} 相关记忆</div><div class="related-list">${related.map(item => `<button class="related-item" data-related="${item.id}"><span class="related-item-title">${esc(item.title)}</span><span class="related-item-meta">${formatDate(item.occurredAt, false)} · ${item.sharedTags.length ? `共同标签：${item.sharedTags.map(esc).join('、')}` : '内容相近'}</span></button>`).join('')}</div></div>` : '';
     const overlay = document.createElement('div'); overlay.className = 'modal-overlay';
-    overlay.innerHTML = `<div class="modal modal-lg" role="dialog" aria-modal="true"><div class="modal-header"><div><span class="memory-type">${getIcon(icon, 14)} ${type}</span><h3 class="modal-title" style="margin-top:7px">${esc(record.title)}</h3></div><button class="btn btn-ghost btn-icon" data-close>${getIcon('x')}</button></div><div class="modal-body"><div class="detail-meta"><span>${getIcon('calendar', 13)} ${formatDate(record.occurredAt)} ${formatTime(record.occurredAt)}</span><span>${getIcon('smile', 13)} ${esc(record.mood)}</span><span>${esc(record.source)}</span></div><div class="memory-tags" style="margin-bottom:18px">${record.tags.map(tag => `<span class="tag tag-teal">${esc(tag)}</span>`).join('')}</div><div class="detail-content">${renderMarkdown(record.content || '这条记忆只有附件，没有文字描述。')}</div>${record.attachments.map(attachmentHTML).join('')}${relatedHTML}</div><div class="modal-footer detail-footer" style="justify-content:space-between"><div class="row"><button class="btn btn-ghost btn-sm" id="detail-pin">${getIcon('pin', 15)} ${record.pinned ? '取消置顶' : '置顶'}</button><button class="btn btn-ghost btn-sm" id="detail-delete">${getIcon('trash', 15)} 删除</button></div><div class="row"><button class="btn btn-secondary btn-sm" id="detail-share">${getIcon('image', 15)} 分享卡片</button><button class="btn btn-dark" id="detail-edit">${getIcon('edit', 15)} 编辑记忆</button></div></div></div>`;
+    overlay.innerHTML = `<div class="modal modal-lg" role="dialog" aria-modal="true"><div class="modal-header"><div><span class="memory-type">${getIcon(icon, 14)} ${type}</span><h3 class="modal-title" style="margin-top:7px">${esc(record.title)}</h3></div><div class="row">${navHTML}<button class="btn btn-ghost btn-icon" data-close>${getIcon('x')}</button></div></div><div class="modal-body"><div class="detail-meta"><span>${getIcon('calendar', 13)} ${formatDate(record.occurredAt)} ${formatTime(record.occurredAt)}</span><span>${getIcon('smile', 13)} ${esc(record.mood)}</span><span>${esc(record.source)}</span></div><div class="memory-tags" style="margin-bottom:18px">${record.tags.map(tag => `<span class="tag tag-teal">${esc(tag)}</span>`).join('')}</div><div class="detail-content">${renderMarkdown(record.content || '这条记忆只有附件，没有文字描述。')}</div>${record.attachments.map(attachmentHTML).join('')}${relatedHTML}</div><div class="modal-footer detail-footer" style="justify-content:space-between"><div class="row"><button class="btn btn-ghost btn-sm" id="detail-pin">${getIcon('pin', 15)} ${record.pinned ? '取消置顶' : '置顶'}</button><button class="btn btn-ghost btn-sm" id="detail-delete">${getIcon('trash', 15)} 删除</button></div><div class="row"><button class="btn btn-secondary btn-sm" id="detail-share">${getIcon('image', 15)} 分享卡片</button><button class="btn btn-dark" id="detail-edit">${getIcon('edit', 15)} 编辑记忆</button></div></div></div>`;
     document.body.appendChild(overlay);
-    overlay.querySelector('[data-close]').onclick = () => overlay.remove();
-    overlay.querySelectorAll('[data-related]').forEach(btn => btn.onclick = () => { const nextId = btn.dataset.related; overlay.remove(); openRecordDetail(nextId); });
+    const goTo = target => { if (!target) return; overlay.remove(); openRecordDetail(target.id); };
+    const onNavKey = event => {
+      if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+      if (!document.body.contains(overlay)) { document.removeEventListener('keydown', onNavKey, true); return; }
+      if (event.target.closest && event.target.closest('input, textarea, audio, video')) return;
+      event.preventDefault();
+      goTo(event.key === 'ArrowLeft' ? earlier : later);
+    };
+    document.addEventListener('keydown', onNavKey, true);
+    overlay.querySelector('[data-close]').onclick = () => { document.removeEventListener('keydown', onNavKey, true); overlay.remove(); };
+    overlay.querySelector('#detail-prev')?.addEventListener('click', () => goTo(earlier));
+    overlay.querySelector('#detail-next')?.addEventListener('click', () => goTo(later));
+    overlay.querySelectorAll('[data-related]').forEach(btn => btn.onclick = () => { document.removeEventListener('keydown', onNavKey, true); const nextId = btn.dataset.related; overlay.remove(); openRecordDetail(nextId); });
     overlay.querySelector('#detail-share').onclick = () => openShareCard(id);
-    overlay.querySelector('#detail-edit').onclick = () => { overlay.remove(); openRecordEditor(id); };
-    overlay.querySelector('#detail-pin').onclick = () => { MemoryStore.togglePin(id); overlay.remove(); showToast('置顶状态已更新', 'success'); };
-    overlay.querySelector('#detail-delete').onclick = () => { overlay.remove(); showConfirm({ title: '删除这条记忆？', message: `「${record.title}」及其附件将被永久删除，建议先导出备份。`, confirmText: '永久删除', onConfirm: () => { MemoryStore.deleteRecord(id); showToast('记忆已删除', 'success'); } }); };
+    overlay.querySelector('#detail-edit').onclick = () => { document.removeEventListener('keydown', onNavKey, true); overlay.remove(); openRecordEditor(id); };
+    overlay.querySelector('#detail-pin').onclick = () => { document.removeEventListener('keydown', onNavKey, true); MemoryStore.togglePin(id); overlay.remove(); showToast('置顶状态已更新', 'success'); };
+    overlay.querySelector('#detail-delete').onclick = () => { document.removeEventListener('keydown', onNavKey, true); overlay.remove(); showConfirm({ title: '删除这条记忆？', message: `「${record.title}」及其附件将被永久删除，建议先导出备份。`, confirmText: '永久删除', onConfirm: () => { MemoryStore.deleteRecord(id); showToast('记忆已删除', 'success'); } }); };
   };
 
   function wrapCanvasText(ctx, text, maxWidth, maxLines) {
