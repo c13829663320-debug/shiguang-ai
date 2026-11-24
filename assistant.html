@@ -25,6 +25,10 @@
       const app = document.getElementById('app');
       const state = { messages: [], loading: false };
       const formatAnswer = (text) => SG.esc(text).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+      const userAvatarHTML = () => {
+        const { avatar, name } = MemoryStore.settings();
+        return avatar ? `<img src="${avatar}" alt="${SG.esc(name)}的头像">` : getIcon('smile', 15);
+      };
       const typingHTML = () => `<div class="chat-message"><div class="chat-avatar">${getIcon('sparkles', 15)}</div><div class="chat-bubble"><span class="typing"><i></i><i></i><i></i></span></div></div>`;
 
       function render() {
@@ -96,7 +100,7 @@
         }
         box.innerHTML = state.messages.map(message => `
           <div class="chat-message ${message.role}">
-            <div class="chat-avatar">${getIcon(message.role === 'user' ? 'smile' : 'sparkles', 15)}</div>
+            <div class="chat-avatar">${message.role === 'user' ? userAvatarHTML() : getIcon('sparkles', 15)}</div>
             <div style="min-width:0">
               <div class="chat-bubble">${message.role === 'user' ? SG.esc(message.content) : formatAnswer(message.content)}</div>
               ${message.role === 'assistant' && message.sources && message.sources.length ? `

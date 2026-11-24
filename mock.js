@@ -12,6 +12,7 @@
 
   const defaultSettings = {
     name: '我的朋友',
+    avatar: '',
     model: 'openai/gpt-4o-mini',
     apiEndpoint: 'https://openrouter.ai/api/v1/chat/completions',
     apiKey: '',

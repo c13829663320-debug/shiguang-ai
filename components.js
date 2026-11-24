@@ -164,8 +164,33 @@
     try { localStorage.removeItem(SEARCH_KEY); } catch (error) { /* 隐私模式忽略 */ }
     return [];
   }
+  // 头像处理：读图后居中裁成正方形，压到 160px 的 JPEG，控制本地存储占用。
+  function processAvatarFile(file) {
+    return new Promise((resolve, reject) => {
+      if (!file.type.startsWith('image/')) { reject(new Error('请选择图片文件（JPG / PNG / WebP）。')); return; }
+      if (file.size > 8 * 1024 * 1024) { reject(new Error('图片过大，请选择 8MB 以内的图片。')); return; }
+      const reader = new FileReader();
+      reader.onerror = () => reject(new Error('读取图片失败，请重试。'));
+      reader.onload = () => {
+        const img = new Image();
+        img.onerror = () => reject(new Error('图片解析失败，请换一张试试。'));
+        img.onload = () => {
+          const size = 160;
+          const canvas = document.createElement('canvas'); canvas.width = size; canvas.height = size;
+          const ctx = canvas.getContext('2d');
+          ctx.fillStyle = '#f6f3ed'; ctx.fillRect(0, 0, size, size);
+          const scale = Math.max(size / img.width, size / img.height);
+          const w = img.width * scale; const h = img.height * scale;
+          ctx.drawImage(img, (size - w) / 2, (size - h) / 2, w, h);
+          resolve(canvas.toDataURL('image/jpeg', 0.85));
+        };
+        img.src = reader.result;
+      };
+      reader.readAsDataURL(file);
+    });
+  }
 
-  window.SG = { esc, typeMap, formatDate, formatTime, relativeTime, fileSize, download, fileToAttachment, markdown: renderMarkdown, highlight, searchHistoryList, rememberSearch, removeSearchHistory, clearSearchHistory };
+  window.SG = { esc, typeMap, formatDate, formatTime, relativeTime, fileSize, download, fileToAttachment, markdown: renderMarkdown, highlight, searchHistoryList, rememberSearch, removeSearchHistory, clearSearchHistory, processAvatarFile };
 
   const applyTheme = (theme) => {
     const dark = theme === 'dark';
@@ -212,6 +237,8 @@
       ['files', '资料库', 'folder', 'files.html'], ['settings', '设置', 'settings', 'settings.html']
     ];
     const name = MemoryStore.settings().name || '我的朋友';
+    const avatar = MemoryStore.settings().avatar;
+    const avatarHTML = avatar ? `<img src="${avatar}" alt="${esc(name)}的头像">` : esc(name.slice(0, 1));
     return `<a class="skip-link" href="#main-content">跳到主要内容</a>
       <aside class="app-sidebar" id="sidebar" aria-label="侧边栏">
       <a class="brand" href="index.html"><span class="brand-mark"></span><span><span class="brand-name">拾光AI</span><span class="brand-sub">MEMORY, MADE VISIBLE</span></span></a>
@@ -219,7 +246,7 @@
       <button class="sidebar-search" data-action="open-search">${getIcon('search', 16)}<span>搜索记忆</span><kbd>${/Mac|iPhone|iPad/.test(navigator.platform) ? '⌘K' : 'Ctrl K'}</kbd></button>
       <div class="nav-label">我的记忆</div>
       <nav class="sidebar-nav" aria-label="主导航">${items.map(item => `<a class="nav-item ${active === item[0] ? 'active' : ''}" href="${item[3]}" ${active === item[0] ? 'aria-current="page"' : ''}>${getIcon(item[2], 19)}<span>${item[1]}</span></a>`).join('')}</nav>
-      <div class="sidebar-bottom"><div class="local-note">${getIcon('shield', 16)}<span>默认仅保存在此浏览器<br>随时导出，记忆由你掌握</span></div><div class="profile-chip"><span class="profile-avatar">${esc(name.slice(0, 1))}</span><span><span class="profile-name">${esc(name)}</span><span class="profile-plan">本地个人档案</span></span></div></div>
+      <div class="sidebar-bottom"><div class="local-note">${getIcon('shield', 16)}<span>默认仅保存在此浏览器<br>随时导出，记忆由你掌握</span></div><div class="profile-chip"><span class="profile-avatar ${avatar ? 'has-img' : ''}">${avatarHTML}</span><span><span class="profile-name">${esc(name)}</span><span class="profile-plan">本地个人档案</span></span></div></div>
     </aside><div class="sidebar-overlay" id="sidebar-overlay"></div>`;
   };
   window.renderPageHeader = function ({ eyebrow = 'SHIGUANG AI', title, subtitle = '', actions = '' }) {
@@ -505,6 +532,8 @@
   window.openShareCard = function (id) {
     const record = MemoryStore.getRecord(id);
     if (!record) { showToast('这条记忆不存在或已删除。', 'error'); return; }
+    const avatarSrc = MemoryStore.settings().avatar;
+    const draw = (avatarImg) => {
     const W = 1080; const H = 1440; const pad = 64; const left = 104; const contentWidth = W - left * 2;
     const serif = '"Noto Serif SC", "Songti SC", SimSun, serif';
     const sans = 'Inter, "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif';
@@ -548,7 +577,15 @@
 
     ctx.fillStyle = '#dedbd2'; ctx.fillRect(left, H - 206, contentWidth, 1);
     ctx.fillStyle = '#1e2623'; ctx.font = `700 28px ${serif}`; ctx.fillText('记录，是对时间最温柔的抵抗。', left, H - 138);
-    ctx.fillStyle = '#89908a'; ctx.font = `500 20px ${sans}`; ctx.fillText('拾光AI · 本地记忆档案', left, H - 94);
+    if (avatarImg) {
+      ctx.save();
+      ctx.beginPath(); ctx.arc(left + 24, H - 101, 24, 0, Math.PI * 2); ctx.clip();
+      ctx.drawImage(avatarImg, left, H - 125, 48, 48);
+      ctx.restore();
+      ctx.strokeStyle = '#dedbd2'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(left + 24, H - 101, 24, 0, Math.PI * 2); ctx.stroke();
+    }
+    ctx.fillStyle = '#89908a'; ctx.font = `500 20px ${sans}`; ctx.fillText('拾光AI · 本地记忆档案', avatarImg ? left + 60 : left, H - 94);
 
     const url = canvas.toDataURL('image/png');
     const overlay = document.createElement('div'); overlay.className = 'modal-overlay';
@@ -560,6 +597,12 @@
       SG.download(`拾光AI-${safeTitle}-${new Date(record.occurredAt).toISOString().slice(0, 10)}.png`, url);
       showToast('分享卡片已开始下载', 'success');
     };
+    };
+    if (!avatarSrc) { draw(null); return; }
+    const avatarImg = new Image();
+    avatarImg.onload = () => draw(avatarImg);
+    avatarImg.onerror = () => draw(null);
+    avatarImg.src = avatarSrc;
   };
 
   window.openDailyReview = function () {

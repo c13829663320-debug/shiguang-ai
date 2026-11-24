@@ -63,7 +63,18 @@
         if (section === 'profile') return `
           <div class="card settings-section">
             <h2 class="settings-title">个人资料</h2>
-            <p class="settings-desc">称呼会出现在工作台的问候与记忆助手中。</p>
+            <p class="settings-desc">称呼与头像会出现在侧边栏、记忆助手对话和分享卡片中。</p>
+            <div class="avatar-row">
+              <span class="profile-avatar avatar-lg ${settings.avatar ? 'has-img' : ''}" id="avatar-preview" role="img" aria-label="${SG.esc(settings.name)}的头像">${settings.avatar ? `<img src="${settings.avatar}" alt="">` : SG.esc(settings.name.slice(0, 1))}</span>
+              <div class="avatar-row-actions">
+                <div class="row wrap">
+                  <button class="btn btn-secondary btn-sm" id="upload-avatar">${getIcon('upload', 14)} 上传头像</button>
+                  <button class="btn btn-ghost btn-sm" id="remove-avatar" ${settings.avatar ? '' : 'hidden'}>移除头像</button>
+                </div>
+                <span class="field-hint">支持 JPG / PNG / WebP，自动裁成正方形并压缩保存，仅存在此浏览器。</span>
+              </div>
+              <input type="file" id="avatar-input" accept="image/*" hidden>
+            </div>
             <div class="form-stack">
               <div class="field">
                 <label class="field-label" for="set-name">我的称呼</label>
@@ -235,6 +246,31 @@
           };
         }
 
+        const avatarInput = document.getElementById('avatar-input');
+        const uploadAvatar = document.getElementById('upload-avatar');
+        const removeAvatar = document.getElementById('remove-avatar');
+        if (uploadAvatar && avatarInput) {
+          uploadAvatar.onclick = () => avatarInput.click();
+          avatarInput.onchange = async () => {
+            const file = avatarInput.files && avatarInput.files[0];
+            avatarInput.value = '';
+            if (!file) return;
+            try {
+              const dataUrl = await SG.processAvatarFile(file);
+              MemoryStore.updateSettings({ avatar: dataUrl });
+              refreshAvatarUI();
+              showToast('头像已更新', 'success');
+            } catch (error) { showToast(error.message || '头像上传失败', 'error'); }
+          };
+        }
+        if (removeAvatar) {
+          removeAvatar.onclick = () => {
+            MemoryStore.updateSettings({ avatar: '' });
+            refreshAvatarUI();
+            showToast('已恢复默认文字头像', 'info');
+          };
+        }
+
         on('save-profile', () => {
           const name = document.getElementById('set-name').value.trim() || '我的朋友';
           MemoryStore.updateSettings({ name });
@@ -303,11 +339,30 @@
         }));
       }
 
+      function avatarInnerHTML(settings, name) {
+        return settings.avatar ? `<img src="${settings.avatar}" alt="">` : SG.esc((name || '我').slice(0, 1));
+      }
+      function refreshAvatarUI() {
+        const settings = MemoryStore.settings();
+        const preview = document.getElementById('avatar-preview');
+        if (preview) {
+          preview.classList.toggle('has-img', Boolean(settings.avatar));
+          preview.innerHTML = avatarInnerHTML(settings, settings.name);
+          preview.setAttribute('aria-label', `${settings.name || '我的朋友'}的头像`);
+        }
+        const chip = document.querySelector('.profile-chip .profile-avatar');
+        if (chip) {
+          chip.classList.toggle('has-img', Boolean(settings.avatar));
+          chip.innerHTML = avatarInnerHTML(settings, settings.name);
+        }
+        const removeBtn = document.getElementById('remove-avatar');
+        if (removeBtn) removeBtn.hidden = !settings.avatar;
+      }
+
       function refreshProfile(name) {
         const nameEl = document.querySelector('.profile-name');
         if (nameEl) nameEl.textContent = name;
-        const avatar = document.querySelector('.profile-avatar');
-        if (avatar) avatar.textContent = name.slice(0, 1);
+        refreshAvatarUI();
       }
 
       render();
