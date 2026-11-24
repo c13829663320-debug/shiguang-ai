@@ -401,21 +401,36 @@ a.heatmap-cell:hover { transform: translateY(-1px); box-shadow: 0 0 0 1.5px var(
 .type-legend-count { margin-left: auto; color: var(--muted); font: 11px var(--mono); }
 .graph-filters { display: flex; gap: 7px; flex-wrap: wrap; margin-bottom: 14px; }
 .graph-chip { padding: 5px 11px; border: 1px solid var(--line); border-radius: 99px; color: var(--ink-soft); font-size: 11px; transition: border .18s, background .18s, color .18s; }
-.graph-chip:hover { border-color: var(--teal); color: var(--teal); }
-.graph-chip.active { border-color: var(--teal); background: var(--teal); color: #fffdf9; }
-.graph-canvas { overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; background: radial-gradient(circle at 50% 45%, #fffdf9, var(--paper)); }
+.graph-chip:hover { border-color: var(--gold); color: var(--gold); }
+.graph-chip.active { border-color: var(--gold); background: var(--gold); color: #1e2623; }
+.graph-canvas { position: relative; overflow-x: auto; border-radius: 14px; background: radial-gradient(ellipse 120% 90% at 50% -10%, #2c3733 0%, #1e2623 68%); box-shadow: inset 0 0 0 1px rgba(214, 168, 75, .18), inset 0 -34px 70px rgba(10, 14, 12, .35); }
 .graph-svg { display: block; width: 100%; min-width: 620px; height: auto; }
-.graph-svg line { stroke: var(--teal); opacity: .24; transition: opacity .18s; }
-.graph-svg line.dim { opacity: .05; }
+.graph-svg .dust { pointer-events: none; }
+.graph-svg .dust.twinkle { animation-name: dust-twinkle; animation-iteration-count: infinite; animation-direction: alternate; animation-timing-function: ease-in-out; }
+@keyframes dust-twinkle { from { opacity: var(--o, .2); } to { opacity: calc(var(--o, .2) * .25); } }
+.graph-svg line { stroke: var(--gold); opacity: .26; transition: opacity .2s; }
+.graph-svg line.dim { opacity: .04; }
+.graph-svg.focus line { opacity: .06; }
+.graph-svg.focus line.lit { opacity: .9; }
+.graph-svg.focus .dust { opacity: .05; }
 .graph-node { cursor: pointer; }
-.graph-node circle { stroke: #fffdf9; stroke-width: 2; transition: stroke .18s; }
-.graph-node:hover circle, .graph-node:focus-visible circle { stroke: var(--coral); stroke-width: 3; }
+.graph-node .halo { opacity: .22; transition: opacity .18s; }
+.graph-node .core { stroke: rgba(248, 244, 234, .4); stroke-width: 1.2; transition: stroke .18s, stroke-width .18s; }
+.graph-node:hover .halo, .graph-node:focus-visible .halo { opacity: .42; }
+.graph-node:hover .core, .graph-node:focus-visible .core { stroke: #f6e8c8; stroke-width: 2.4; }
 .graph-node:focus { outline: none; }
-.graph-node text { fill: var(--ink-soft); font: 500 10px var(--sans); pointer-events: none; }
+.graph-node text { fill: #cfc9bb; font: 500 10px var(--sans); pointer-events: none; transition: fill .18s; }
+.graph-node:hover text, .graph-node.lit text, .graph-node:focus-visible text { fill: #f0dfb0; }
 .graph-node.dim { opacity: .16; }
+.graph-svg.focus .graph-node:not(.lit) { opacity: .14; }
+.graph-node.star-pinned .halo { opacity: .5; animation: star-pulse 3.4s ease-in-out infinite; }
+.graph-node.star-pinned .core { stroke: #e8c56f; stroke-width: 1.6; }
+.graph-node.star-pinned text { fill: #e6d3a0; }
+@keyframes star-pulse { 0%, 100% { opacity: .38; } 50% { opacity: .72; } }
 .graph-legend { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-top: 12px; color: var(--muted); font-size: 10px; }
 .graph-legend-item { display: inline-flex; align-items: center; gap: 5px; }
-.graph-empty { padding: 40px; color: var(--muted); font-size: 12px; text-align: center; }
+.graph-empty { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; color: #b9c3bc; font-size: 12px; line-height: 2; }
+@media (prefers-reduced-motion: reduce) { .graph-svg .dust.twinkle, .graph-node.star-pinned .halo { animation: none; } }
 
 /* 年度回顾 */
 .annual-select { width: auto; min-height: 42px; }
@@ -787,8 +802,8 @@ body.reduce-motion .intro { display: none; }
 [data-theme="dark"] .chat-message.user .chat-avatar { background: #2b3335; color: var(--ink); }
 [data-theme="dark"] .chat-message.user .chat-bubble { background: #2b3335; color: var(--ink); }
 [data-theme="dark"] .chat-bubble { background: #232b2d; }
-[data-theme="dark"] .graph-canvas { background: radial-gradient(circle at 50% 45%, #1d2224, var(--paper)); }
-[data-theme="dark"] .graph-node circle { stroke: #1b2022; }
+[data-theme="dark"] .graph-canvas { background: radial-gradient(ellipse 120% 90% at 50% -10%, #242d29 0%, #171d1b 68%); }
+[data-theme="dark"] .graph-svg line { opacity: .32; }
 [data-theme="dark"] .upload-zone { border-color: rgba(111, 184, 174, .3); background: rgba(255, 255, 255, .03); }
 [data-theme="dark"] .upload-zone:hover, [data-theme="dark"] .upload-zone.dragover { border-color: var(--coral); background: rgba(231, 111, 81, .07); }
 [data-theme="dark"] .upload-illustration, [data-theme="dark"] .empty-illustration { mix-blend-mode: normal; opacity: .9; }

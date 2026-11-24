@@ -24,6 +24,7 @@
     (function () {
       const app = document.getElementById('app');
       const TYPE_COLORS = { text: '#2a6f6a', image: '#e76f51', audio: '#d6a84b', video: '#8a9a5b', link: '#8a7b9b', document: '#b0795e' };
+      const STAR_COLORS = { text: '#7cc4ba', image: '#f0946f', audio: '#e3c27a', video: '#a9bd77', link: '#b3a3d4', document: '#cf9a7c' };
       const WEEKDAYS = ['一', '二', '三', '四', '五', '六', '日'];
       let graphTag = '';
 
@@ -75,34 +76,90 @@
         return { W, H };
       }
 
+      function starDust(count, W, H) {
+        let seed = 20261124;
+        const rand = () => { seed = (seed * 9301 + 49297) % 233280; return seed / 233280; };
+        let dots = '';
+        for (let index = 0; index < count; index += 1) {
+          const x = (rand() * W).toFixed(1);
+          const y = (rand() * H).toFixed(1);
+          const r = (0.6 + rand() * 1.1).toFixed(2);
+          const o = (0.08 + rand() * 0.3).toFixed(2);
+          const duration = (2.8 + rand() * 4.4).toFixed(2);
+          const delay = (rand() * 4).toFixed(2);
+          dots += `<circle class="dust${rand() > 0.45 ? ' twinkle' : ''}" style="--o:${o};animation-duration:${duration}s;animation-delay:${delay}s" cx="${x}" cy="${y}" r="${r}" fill="#e8e2d0" opacity="${o}"></circle>`;
+        }
+        return dots;
+      }
+
       function renderGraph() {
         const root = document.getElementById('graph-root');
         if (!root) return;
-        const data = MemoryStore.graph();
-        if (!data.nodes.length) { root.innerHTML = '<div class="graph-empty">还没有可以连线的记忆。</div>'; return; }
-        const { W, H } = layoutGraph(data.nodes, data.links);
-        const byId = new Map(data.nodes.map(node => [node.id, node]));
-        const maxDegree = Math.max(...data.nodes.map(node => node.degree), 1);
+        let { nodes, links } = MemoryStore.graph();
+        if (!nodes.length) {
+          root.innerHTML = `<div class="graph-canvas"><svg class="graph-svg" viewBox="0 0 820 460" aria-hidden="true">${starDust(46, 820, 460)}</svg><div class="graph-empty">夜空在等第一颗星。<br>记下一件小事，让它亮起来。</div></div>`;
+          return;
+        }
+        if (nodes.length > 26) {
+          const keep = new Set(nodes.slice().sort((a, b) => b.occurredAt - a.occurredAt).slice(0, 26).map(node => node.id));
+          nodes = nodes.filter(node => keep.has(node.id));
+          links = links.filter(link => keep.has(link.source) && keep.has(link.target));
+          const degree = {};
+          links.forEach(link => { degree[link.source] = (degree[link.source] || 0) + 1; degree[link.target] = (degree[link.target] || 0) + 1; });
+          nodes.forEach(node => { node.degree = degree[node.id] || 0; });
+        }
+        const { W, H } = layoutGraph(nodes, links);
+        const byId = new Map(nodes.map(node => [node.id, node]));
+        const maxDegree = Math.max(...nodes.map(node => node.degree), 1);
+        const pinnedIds = new Set(MemoryStore.listRecords().filter(record => record.pinned).map(record => record.id));
+        const neighbors = new Map(nodes.map(node => [node.id, new Set()]));
+        links.forEach(link => {
+          if (neighbors.has(link.source)) neighbors.get(link.source).add(link.target);
+          if (neighbors.has(link.target)) neighbors.get(link.target).add(link.source);
+        });
         const insightsData = MemoryStore.insights();
         const filters = `<div class="graph-filters"><button class="graph-chip ${graphTag ? '' : 'active'}" data-graph-tag="">全部</button>${insightsData.tags.slice(0, 6).map(tag => `<button class="graph-chip ${graphTag === tag.name ? 'active' : ''}" data-graph-tag="${SG.esc(tag.name)}">${SG.esc(tag.name)}</button>`).join('')}</div>`;
-        const lines = data.links.map(link => {
+        const lines = links.map(link => {
           const a = byId.get(link.source); const b = byId.get(link.target);
           const dim = graphTag && !(a.tags.includes(graphTag) && b.tags.includes(graphTag));
-          return `<line x1="${a.x.toFixed(1)}" y1="${a.y.toFixed(1)}" x2="${b.x.toFixed(1)}" y2="${b.y.toFixed(1)}" stroke-width="${Math.min(3, 0.8 + link.weight * 0.7).toFixed(2)}"${dim ? ' class="dim"' : ''}></line>`;
+          return `<line x1="${a.x.toFixed(1)}" y1="${a.y.toFixed(1)}" x2="${b.x.toFixed(1)}" y2="${b.y.toFixed(1)}" stroke-width="${Math.min(2.6, 0.7 + link.weight * 0.55).toFixed(2)}" data-line="${link.source}|${link.target}"${dim ? ' class="dim"' : ''}></line>`;
         }).join('');
-        const nodes = data.nodes.map(node => {
+        const nodeMarks = nodes.map(node => {
           const dim = graphTag && !node.tags.includes(graphTag);
-          const radius = 11 + Math.round(node.degree / maxDegree * 8);
-          return `<g class="graph-node ${dim ? 'dim' : ''}" data-record="${node.id}" tabindex="0" role="button" aria-label="${SG.esc(node.title)}"><title>${SG.esc(node.title)} · ${SG.esc(node.tags.join('、'))}</title><circle cx="${node.x.toFixed(1)}" cy="${node.y.toFixed(1)}" r="${radius}" fill="${TYPE_COLORS[node.type] || '#2a6f6a'}"></circle><text x="${node.x.toFixed(1)}" y="${(node.y + radius + 15).toFixed(1)}" text-anchor="middle">${SG.esc(node.title.slice(0, 12))}</text></g>`;
+          const pinned = pinnedIds.has(node.id);
+          const radius = 9 + Math.round(node.degree / maxDegree * 7);
+          const color = STAR_COLORS[node.type] || '#7cc4ba';
+          const x = node.x.toFixed(1); const y = node.y.toFixed(1);
+          return `<g class="graph-node${dim ? ' dim' : ''}${pinned ? ' star-pinned' : ''}" data-record="${node.id}" tabindex="0" role="button" aria-label="打开记忆：${SG.esc(node.title)}"><title>${SG.esc(node.title)} · ${SG.esc(node.tags.join('、')) || '未加标签'}${pinned ? ' · 置顶' : ''}</title><circle class="halo" cx="${x}" cy="${y}" r="${(radius * 2.15).toFixed(1)}" fill="${color}"></circle><circle class="core" cx="${x}" cy="${y}" r="${radius}" fill="${color}"></circle><text x="${x}" y="${(node.y + radius + 15).toFixed(1)}" text-anchor="middle">${SG.esc(node.title.slice(0, 12))}</text></g>`;
         }).join('');
-        const legend = insightsData.types.map(item => `<span class="graph-legend-item"><span class="type-dot" style="background:${TYPE_COLORS[item.name] || '#c9c4b8'}"></span>${SG.typeMap[item.name]?.[0] || item.name}</span>`).join('');
-        root.innerHTML = `${filters}<div class="graph-canvas"><svg class="graph-svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="记忆关联图谱"><g>${lines}</g><g>${nodes}</g></svg></div><div class="graph-legend">${legend}<span class="graph-legend-item">${getIcon('info', 12)} 节点越大，关联越多；点击节点查看记忆</span></div>`;
+        const legend = insightsData.types.map(item => `<span class="graph-legend-item"><span class="type-dot" style="background:${STAR_COLORS[item.name] || '#7cc4ba'}"></span>${SG.typeMap[item.name]?.[0] || item.name}</span>`).join('');
+        root.innerHTML = `${filters}<div class="graph-canvas"><svg class="graph-svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="记忆星图：每个星点是一条记忆，连线代表共同标签或相似内容">${starDust(46, W, H)}<g class="layer-lines">${lines}</g><g class="layer-nodes">${nodeMarks}</g></svg></div><div class="graph-legend">${legend}<span class="graph-legend-item">${getIcon('info', 12)} 星点越大关联越多；悬停聚焦相邻记忆，点击星点打开详情</span></div>`;
+        const svg = root.querySelector('.graph-svg');
         root.querySelectorAll('[data-graph-tag]').forEach(btn => btn.onclick = () => {
           const value = btn.dataset.graphTag;
           graphTag = !value ? '' : (graphTag === value ? '' : value);
           renderGraph();
         });
         root.querySelectorAll('.graph-node').forEach(node => {
+          const clearFocus = () => {
+            svg.classList.remove('focus');
+            root.querySelectorAll('.lit').forEach(el => el.classList.remove('lit'));
+          };
+          const applyFocus = () => {
+            const id = node.dataset.record;
+            const near = neighbors.get(id) || new Set();
+            near.add(id);
+            svg.classList.add('focus');
+            root.querySelectorAll('.graph-node').forEach(el => { el.classList.toggle('lit', near.has(el.dataset.record)); });
+            root.querySelectorAll('[data-line]').forEach(line => {
+              const [source, target] = line.dataset.line.split('|');
+              line.classList.toggle('lit', source === id || target === id);
+            });
+          };
+          node.addEventListener('mouseenter', applyFocus);
+          node.addEventListener('mouseleave', clearFocus);
+          node.addEventListener('focus', applyFocus);
+          node.addEventListener('blur', clearFocus);
           node.onclick = () => window.openRecordDetail(node.dataset.record);
           node.onkeydown = event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); window.openRecordDetail(node.dataset.record); } };
         });
@@ -230,8 +287,8 @@
 
                 <section class="card insight-card section">
                   <div class="section-head">
-                    <div><div class="section-kicker">CONNECTIONS</div><h3 class="section-title">记忆关联图谱</h3></div>
-                    <span class="section-note">共同标签与相似内容会自动连线</span>
+                    <div><div class="section-kicker">MEMORY CONSTELLATION</div><h3 class="section-title">记忆星图</h3></div>
+                    <span class="section-note">散落的片段，也会相遇 · 悬停星点聚焦相邻记忆</span>
                   </div>
                   <div id="graph-root"></div>
                 </section>
