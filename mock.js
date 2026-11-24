@@ -111,6 +111,18 @@
     });
     return Object.entries(counts).sort((a, b) => b[1] - a[1]).map(([name, count]) => ({ name, count }));
   }
+  // 本地标签词表：无需联网，用关键词命中给正文推荐标签。
+  const TAG_RULES = [
+    { tag: '学习', keywords: ['背单词', '复习', '课程', '笔记', '考试', '精听', '练习', '学习'] },
+    { tag: '英语', keywords: ['英语', '单词', '听力', '口语', '播客', 'podcast'] },
+    { tag: '工作', keywords: ['会议', '项目', '方案', '评审', '同事', '客户', '汇报', '加班', '需求'] },
+    { tag: '阅读', keywords: ['读书', '看书', '书里', '读到', '章节', '作者'] },
+    { tag: '运动', keywords: ['跑步', '健身', '游泳', '瑜伽', '拉伸', '公里', '球'] },
+    { tag: '家人', keywords: ['妈妈', '爸爸', '父母', '家里', '奶奶', '爷爷', '孩子'] },
+    { tag: '灵感', keywords: ['灵感', '突然想到', '点子', '想法', '创意'] },
+    { tag: '复盘', keywords: ['复盘', '反思', '总结', '回顾', '改进'] },
+    { tag: '生活', keywords: ['散步', '做饭', '早餐', '午饭', '晚饭', '购物', '打扫', '天气', '咖啡'] }
+  ];
   function textBigrams(value) {
     const clean = String(value || '').toLowerCase().replace(/[\s，。、！？：；“”‘’（）《》…—\-,.!?;:'"()[\]/]/g, '');
     const set = new Set();
@@ -227,6 +239,20 @@
       return { nodes: clone(nodes), links: clone(links) };
     },
     tags() { return topCounts(db.records, 'tags'); },
+    suggestTags(text, exclude = [], limit = 3) {
+      const source = String(text || '').toLowerCase();
+      if (source.trim().length < 4) return [];
+      const scores = new Map();
+      topCounts(db.records, 'tags').forEach(item => {
+        if (exclude.includes(item.name)) return;
+        if (source.includes(String(item.name).toLowerCase())) scores.set(item.name, 3);
+      });
+      TAG_RULES.forEach(rule => {
+        if (exclude.includes(rule.tag)) return;
+        if (rule.keywords.some(word => source.includes(word))) scores.set(rule.tag, (scores.get(rule.tag) || 0) + 2);
+      });
+      return [...scores.entries()].sort((a, b) => b[1] - a[1]).slice(0, limit).map(([name]) => name);
+    },
     renameTag(from, to) {
       const source = String(from || '').trim();
       const target = String(to || '').trim();

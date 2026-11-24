@@ -612,6 +612,10 @@ a.heatmap-cell:hover { transform: translateY(-1px); box-shadow: 0 0 0 1.5px var(
 .editor-dropzone svg { flex-shrink: 0; }
 .editor-dropzone.active { border-color: var(--gold); background: rgba(214, 168, 75, .12); color: var(--ink); }
 [data-theme="dark"] .editor-dropzone.active { background: rgba(214, 168, 75, .16); color: var(--ink); }
+.tag-suggest { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.tag-suggest-label { display: inline-flex; align-items: center; gap: 4px; color: var(--muted); font-size: 10px; letter-spacing: .04em; }
+.tag-suggest-chip { display: inline-flex; align-items: center; gap: 3px; padding: 3px 9px; border: 1px dashed var(--gold); border-radius: 99px; background: transparent; color: var(--gold); font-size: 11px; transition: background .16s, color .16s; }
+.tag-suggest-chip:hover, .tag-suggest-chip:focus-visible { background: var(--gold); color: #1e2623; }
 .editor-attachments { display: flex; flex-direction: column; gap: 7px; }
 .editor-attachment { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 8px; background: var(--paper); font-size: 11px; }
 .editor-attachment span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
