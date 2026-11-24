@@ -154,12 +154,18 @@
     try { localStorage.setItem(SEARCH_KEY, JSON.stringify(next)); } catch (error) { /* 隐私模式忽略 */ }
     return next;
   }
+  function removeSearchHistory(keyword) {
+    const value = String(keyword || '').trim();
+    const next = searchHistoryList().filter(item => item !== value);
+    try { localStorage.setItem(SEARCH_KEY, JSON.stringify(next)); } catch (error) { /* 隐私模式忽略 */ }
+    return next;
+  }
   function clearSearchHistory() {
     try { localStorage.removeItem(SEARCH_KEY); } catch (error) { /* 隐私模式忽略 */ }
     return [];
   }
 
-  window.SG = { esc, typeMap, formatDate, formatTime, relativeTime, fileSize, download, fileToAttachment, markdown: renderMarkdown, highlight, searchHistoryList, rememberSearch, clearSearchHistory };
+  window.SG = { esc, typeMap, formatDate, formatTime, relativeTime, fileSize, download, fileToAttachment, markdown: renderMarkdown, highlight, searchHistoryList, rememberSearch, removeSearchHistory, clearSearchHistory };
 
   const applyTheme = (theme) => {
     const dark = theme === 'dark';

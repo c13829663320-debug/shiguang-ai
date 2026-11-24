@@ -117,6 +117,11 @@
               <div><div class="setting-name">标签管理</div><div class="setting-note">重命名、合并或删除标签，相关记忆会同步更新。</div></div>
               <button class="btn btn-secondary btn-sm" id="open-tag-manager">管理标签</button>
             </div>
+            <div class="setting-row">
+              <div><div class="setting-name">搜索历史</div><div class="setting-note">最近搜索会显示在搜索框下方，最多保留 5 条。</div></div>
+              <button class="btn btn-secondary btn-sm" id="manage-search-history" aria-expanded="false">管理</button>
+            </div>
+            <div class="search-history-manage" id="search-history-manage" hidden>${searchHistoryHTML()}</div>
           </div>`;
         if (section === 'data') return `
           <div class="card settings-section">
@@ -157,6 +162,16 @@
           </div>`;
       }
 
+      function searchHistoryHTML() {
+        const list = SG.searchHistoryList();
+        if (!list.length) return `<p class="muted small" style="margin:12px 0 4px">还没有搜索记录，去时光轴搜索或按 Ctrl+K 试试。</p>`;
+        return `<div class="history-manage-list">${list.map(word => `<div class="history-manage-item">
+            <a class="history-manage-term" href="history.html?query=${encodeURIComponent(word)}">${getIcon('clock', 13)}<span>${SG.esc(word)}</span></a>
+            <button class="btn btn-ghost btn-sm" data-history-remove="${SG.esc(word)}" title="删除这条搜索">${getIcon('x', 14)}</button>
+          </div>`).join('')}</div>
+          <button class="btn btn-ghost btn-sm" id="clear-search-history">${getIcon('trash', 14)} 清空全部搜索历史</button>`;
+      }
+
       function bindSection() {
         app.querySelectorAll('[data-toggle]').forEach(el => {
           el.onclick = () => {
@@ -167,6 +182,33 @@
           };
         });
         const on = (id, handler) => { const el = document.getElementById(id); if (el) el.onclick = handler; };
+
+        const manageSearch = document.getElementById('manage-search-history');
+        const searchPanel = document.getElementById('search-history-manage');
+        if (manageSearch && searchPanel) {
+          manageSearch.onclick = () => {
+            const open = searchPanel.hidden;
+            searchPanel.hidden = !open;
+            manageSearch.textContent = open ? '收起' : '管理';
+            manageSearch.setAttribute('aria-expanded', String(open));
+          };
+          searchPanel.addEventListener('click', event => {
+            const remove = event.target.closest('[data-history-remove]');
+            if (remove) {
+              SG.removeSearchHistory(remove.dataset.historyRemove);
+              searchPanel.innerHTML = searchHistoryHTML();
+              showToast('已删除这条搜索历史', 'success');
+              return;
+            }
+            if (event.target.closest('#clear-search-history')) {
+              showConfirm({
+                title: '清空搜索历史？', message: '将删除本浏览器内保存的所有最近搜索词，不影响记忆数据。',
+                confirmText: '清空',
+                onConfirm: () => { SG.clearSearchHistory(); searchPanel.innerHTML = searchHistoryHTML(); showToast('搜索历史已清空', 'success'); }
+              });
+            }
+          });
+        }
 
         on('open-tag-manager', () => openTagManager());
 
