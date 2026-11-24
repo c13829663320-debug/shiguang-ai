@@ -27,6 +27,14 @@
       const state = { query: params.get('query') || '', type: params.get('type') || '', tag: params.get('tag') || '', pinned: false, day: null };
       const startToday = new Date(); startToday.setHours(0, 0, 0, 0);
       let cal = { year: startToday.getFullYear(), month: startToday.getMonth() };
+      const dateParam = params.get('date');
+      if (dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam)) {
+        const picked = new Date(`${dateParam}T00:00:00`);
+        if (!Number.isNaN(picked.getTime())) {
+          state.day = picked.getTime();
+          cal = { year: picked.getFullYear(), month: picked.getMonth() };
+        }
+      }
       const dateStamp = () => new Date().toISOString().slice(0, 10);
       const debounce = (fn, ms) => { let timer; return (...args) => { clearTimeout(timer); timer = setTimeout(() => fn(...args), ms); }; };
 

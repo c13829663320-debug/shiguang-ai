@@ -118,6 +118,78 @@
         return `conic-gradient(${stops.join(', ')})`;
       }
 
+      function dateKey(date) {
+        return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+      }
+
+      function heatmapStats() {
+        const today = new Date(); today.setHours(0, 0, 0, 0);
+        const monday = new Date(today); monday.setDate(today.getDate() - ((today.getDay() + 6) % 7));
+        const start = new Date(monday); start.setDate(monday.getDate() - 77);
+        const counts = new Map();
+        MemoryStore.listRecords().forEach(record => {
+          const date = new Date(record.occurredAt); date.setHours(0, 0, 0, 0);
+          if (date < start || date > today) return;
+          const key = dateKey(date);
+          counts.set(key, (counts.get(key) || 0) + 1);
+        });
+        const weeks = [];
+        for (let week = 0; week < 12; week += 1) {
+          const days = [];
+          for (let day = 0; day < 7; day += 1) {
+            const date = new Date(start); date.setDate(start.getDate() + week * 7 + day);
+            const key = dateKey(date);
+            days.push({ date, key, count: counts.get(key) || 0, future: date > today });
+          }
+          weeks.push(days);
+        }
+        let maxStreak = 0; let running = 0;
+        weeks.forEach(days => days.forEach(day => {
+          if (day.future) return;
+          if (day.count > 0) { running += 1; maxStreak = Math.max(maxStreak, running); }
+          else running = 0;
+        }));
+        return { weeks, start, today, activeDays: counts.size, maxStreak };
+      }
+
+      function renderHeatmap() {
+        const root = document.getElementById('heatmap-root');
+        if (!root) return;
+        const { weeks, start, today, activeDays, maxStreak } = heatmapStats();
+        const level = count => count === 0 ? 0 : count >= 5 ? 4 : count >= 3 ? 3 : count === 2 ? 2 : 1;
+        const label = date => `${date.getMonth() + 1} 月 ${date.getDate()} 日`;
+        const months = [];
+        weeks.forEach((days, index) => {
+          const name = `${days[0].date.getMonth() + 1}月`;
+          if (!months.length || months[months.length - 1].label !== name) months.push({ label: name, index });
+        });
+        const cells = weeks.map(days => days.map(day => {
+          if (day.future) return '<span class="heatmap-cell future"></span>';
+          if (day.count === 0) return `<span class="heatmap-cell lv0" title="${label(day.date)} · 还没有记录" aria-label="${label(day.date)}，还没有记录"></span>`;
+          return `<a class="heatmap-cell lv${level(day.count)}" href="history.html?date=${day.key}" title="${label(day.date)} · ${day.count} 条记忆" aria-label="${label(day.date)}，${day.count} 条记忆"></a>`;
+        }).join('')).join('');
+        const total = weeks.reduce((sum, days) => sum + days.reduce((inner, day) => inner + (day.future ? 0 : day.count), 0), 0);
+        root.innerHTML = `
+          <div class="heatmap-wrap">
+            <div class="heatmap">
+              <div class="heatmap-weekdays"><span></span><span>一</span><span></span><span>三</span><span></span><span>五</span><span></span></div>
+              <div class="heatmap-body">
+                <div class="heatmap-months">${months.map(item => `<span style="left:${item.index * 18}px">${item.label}</span>`).join('')}</div>
+                <div class="heatmap-grid">${cells}</div>
+              </div>
+            </div>
+            <div class="heatmap-facts">
+              <div class="heatmap-fact"><strong>${total}</strong><span>近 12 周记录</span></div>
+              <div class="heatmap-fact"><strong>${activeDays}</strong><span>有记录的天数</span></div>
+              <div class="heatmap-fact"><strong>${maxStreak}</strong><span>最长连续天数</span></div>
+            </div>
+          </div>
+          <div class="heatmap-legend">
+            <span class="muted small">少</span>${[0, 1, 2, 3, 4].map(value => `<span class="heatmap-cell lv${value}"></span>`).join('')}<span class="muted small">多</span>
+            <span class="muted small heatmap-range">${label(start)} – ${label(today)}</span>
+          </div>`;
+      }
+
       function render() {
         const data = MemoryStore.insights();
         const hasRecords = data.total > 0;
@@ -147,6 +219,14 @@
                 </div>
 
                 <div class="insight-strip">${getIcon('sparkles', 16)}<span>你最常记录的主题是 <strong>「${SG.esc(data.topTag?.name || '日常')}」</strong>（${data.topTag?.count || 0} 次），高频心情是 <strong>「${SG.esc(data.topMood?.name || '平静')}」</strong>，记录最集中的时段是 <strong>「${data.peakPeriod.label}」</strong>。</span></div>
+
+                <section class="card insight-card section">
+                  <div class="section-head">
+                    <div><div class="section-kicker">CONSISTENCY</div><h3 class="section-title">记录热力图</h3></div>
+                    <span class="section-note">最近 12 周 · 点击有色格子查看当天记忆</span>
+                  </div>
+                  <div id="heatmap-root"></div>
+                </section>
 
                 <section class="card insight-card section">
                   <div class="section-head">
@@ -213,6 +293,7 @@
             </div>
           </main>`;
         renderGraph();
+        renderHeatmap();
       }
 
       window.addEventListener('shiguang:change', render);
