@@ -212,24 +212,25 @@
       ['files', '资料库', 'folder', 'files.html'], ['settings', '设置', 'settings', 'settings.html']
     ];
     const name = MemoryStore.settings().name || '我的朋友';
-    return `<aside class="app-sidebar" id="sidebar">
+    return `<a class="skip-link" href="#main-content">跳到主要内容</a>
+      <aside class="app-sidebar" id="sidebar" aria-label="侧边栏">
       <a class="brand" href="index.html"><span class="brand-mark"></span><span><span class="brand-name">拾光AI</span><span class="brand-sub">MEMORY, MADE VISIBLE</span></span></a>
       <button class="btn btn-primary sidebar-capture" data-action="new-record">${getIcon('plus', 17)} 留下此刻</button>
       <button class="sidebar-search" data-action="open-search">${getIcon('search', 16)}<span>搜索记忆</span><kbd>${/Mac|iPhone|iPad/.test(navigator.platform) ? '⌘K' : 'Ctrl K'}</kbd></button>
       <div class="nav-label">我的记忆</div>
-      <nav class="sidebar-nav">${items.map(item => `<a class="nav-item ${active === item[0] ? 'active' : ''}" href="${item[3]}" ${active === item[0] ? 'aria-current="page"' : ''}>${getIcon(item[2], 19)}<span>${item[1]}</span></a>`).join('')}</nav>
+      <nav class="sidebar-nav" aria-label="主导航">${items.map(item => `<a class="nav-item ${active === item[0] ? 'active' : ''}" href="${item[3]}" ${active === item[0] ? 'aria-current="page"' : ''}>${getIcon(item[2], 19)}<span>${item[1]}</span></a>`).join('')}</nav>
       <div class="sidebar-bottom"><div class="local-note">${getIcon('shield', 16)}<span>默认仅保存在此浏览器<br>随时导出，记忆由你掌握</span></div><div class="profile-chip"><span class="profile-avatar">${esc(name.slice(0, 1))}</span><span><span class="profile-name">${esc(name)}</span><span class="profile-plan">本地个人档案</span></span></div></div>
     </aside><div class="sidebar-overlay" id="sidebar-overlay"></div>`;
   };
   window.renderPageHeader = function ({ eyebrow = 'SHIGUANG AI', title, subtitle = '', actions = '' }) {
-    return `<header class="page-header"><div class="row"><button class="btn btn-ghost btn-icon mobile-menu-btn" id="mobile-menu-btn" aria-label="打开导航">${getIcon('menu', 21)}</button><div class="page-heading"><div class="eyebrow">${esc(eyebrow)}</div><h1 class="page-title">${esc(title)}</h1>${subtitle ? `<p class="page-subtitle">${esc(subtitle)}</p>` : ''}</div></div><div class="page-actions">${actions}</div></header>`;
+    return `<header class="page-header"><div class="row"><button class="btn btn-ghost btn-icon mobile-menu-btn" id="mobile-menu-btn" aria-label="打开导航" aria-controls="sidebar" aria-expanded="false">${getIcon('menu', 21)}</button><div class="page-heading"><div class="eyebrow">${esc(eyebrow)}</div><h1 class="page-title">${esc(title)}</h1>${subtitle ? `<p class="page-subtitle">${esc(subtitle)}</p>` : ''}</div></div><div class="page-actions">${actions}</div></header>`;
   };
   window.renderEmptyState = function ({ icon = 'book', title, description = '', action = '' }) {
     return `<div class="empty-state"><div class="empty-icon">${getIcon(icon, 27)}</div><h3 class="empty-title">${esc(title)}</h3><p class="empty-desc">${esc(description)}</p>${action}</div>`;
   };
   window.renderRecordCard = function (record) {
     const [type, icon] = typeMap[record.type] || typeMap.text;
-    return `<article class="memory-card ${record.pinned ? 'pinned' : ''}" onclick="openRecordDetail('${record.id}')"><div class="memory-card-top"><span class="memory-type">${getIcon(icon, 14)} ${type}</span><span class="memory-date">${record.pinned ? `<span class="pin-mark">${getIcon('pin', 13)}</span> ` : ''}${relativeTime(record.occurredAt)}</span></div><h3 class="memory-title">${esc(record.title)}</h3><p class="memory-excerpt">${esc(record.content || record.attachments.map(f => f.name).join('、') || '暂无文字描述')}</p><div class="memory-footer"><div class="memory-tags">${record.tags.slice(0, 3).map(tag => `<span class="tag">${esc(tag)}</span>`).join('')}</div><span class="row small muted" style="gap:5px"><i class="mood-dot"></i>${esc(record.mood)}</span></div></article>`;
+    return `<article class="memory-card ${record.pinned ? 'pinned' : ''}" tabindex="0" role="button" data-clickable aria-label="打开记忆：${esc(record.title)}" onclick="openRecordDetail('${record.id}')"><div class="memory-card-top"><span class="memory-type">${getIcon(icon, 14)} ${type}</span><span class="memory-date">${record.pinned ? `<span class="pin-mark">${getIcon('pin', 13)}</span> ` : ''}${relativeTime(record.occurredAt)}</span></div><h3 class="memory-title">${esc(record.title)}</h3><p class="memory-excerpt">${esc(record.content || record.attachments.map(f => f.name).join('、') || '暂无文字描述')}</p><div class="memory-footer"><div class="memory-tags">${record.tags.slice(0, 3).map(tag => `<span class="tag">${esc(tag)}</span>`).join('')}</div><span class="row small muted" style="gap:5px"><i class="mood-dot"></i>${esc(record.mood)}</span></div></article>`;
   };
 
   const PAGES = [
@@ -339,22 +340,82 @@
   };
 
   let shellInitialized = false;
+  const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
+  function enhanceModals() {
+    const stack = [];
+    const observer = new MutationObserver(mutations => {
+      mutations.forEach(mutation => {
+        mutation.addedNodes.forEach(node => {
+          if (!(node instanceof Element) || !node.classList.contains('modal-overlay')) return;
+          const dialog = node.querySelector('[role="dialog"]') || node.querySelector('.modal');
+          if (!dialog) return;
+          if (!dialog.hasAttribute('role')) dialog.setAttribute('role', 'dialog');
+          dialog.setAttribute('aria-modal', 'true');
+          if (!dialog.hasAttribute('aria-label') && !dialog.hasAttribute('aria-labelledby')) {
+            const title = dialog.querySelector('.modal-title');
+            if (title) { const id = `modal-title-${Date.now().toString(36)}`; title.id = id; dialog.setAttribute('aria-labelledby', id); }
+          }
+          dialog.setAttribute('tabindex', '-1');
+          stack.push({ overlay: node, previous: document.activeElement });
+          const target = dialog.querySelectorAll(FOCUSABLE)[0] || dialog;
+          target.focus({ preventScroll: true });
+        });
+        mutation.removedNodes.forEach(node => {
+          if (!(node instanceof Element) || !node.classList.contains('modal-overlay')) return;
+          const index = stack.findIndex(item => item.overlay === node);
+          if (index === -1) return;
+          const [{ previous }] = stack.splice(index, 1);
+          if (previous && document.contains(previous)) previous.focus({ preventScroll: true });
+        });
+      });
+    });
+    observer.observe(document.body, { childList: true });
+    document.addEventListener('keydown', event => {
+      if (event.key !== 'Tab') return;
+      const top = stack[stack.length - 1];
+      if (!top || !document.contains(top.overlay)) return;
+      const dialog = top.overlay.querySelector('[role="dialog"]') || top.overlay.querySelector('.modal');
+      if (!dialog) return;
+      const focusables = [...dialog.querySelectorAll(FOCUSABLE)].filter(el => el.getClientRects().length > 0);
+      if (!focusables.length) { event.preventDefault(); dialog.focus(); return; }
+      const first = focusables[0]; const last = focusables[focusables.length - 1];
+      const outside = !dialog.contains(document.activeElement);
+      if (event.shiftKey && (document.activeElement === first || outside)) { event.preventDefault(); last.focus(); }
+      else if (!event.shiftKey && (document.activeElement === last || outside)) { event.preventDefault(); first.focus(); }
+    });
+  }
   window.initShell = function () {
     const settings = MemoryStore.settings();
     document.body.classList.toggle('reduce-motion', settings.reduceMotion);
     if (shellInitialized) return;
     shellInitialized = true;
+    const main = document.querySelector('.app-main');
+    if (main && !main.id) { main.id = 'main-content'; main.setAttribute('tabindex', '-1'); }
+    const setSidebar = open => {
+      document.getElementById('sidebar')?.classList.toggle('open', open);
+      document.getElementById('sidebar-overlay')?.classList.toggle('active', open);
+      document.getElementById('mobile-menu-btn')?.setAttribute('aria-expanded', String(open));
+    };
     document.addEventListener('click', event => {
       if (event.target.closest('[data-action="new-record"]')) openRecordEditor();
       if (event.target.closest('[data-action="open-search"]')) openCommandPalette();
-      if (event.target.closest('#mobile-menu-btn')) { document.getElementById('sidebar')?.classList.add('open'); document.getElementById('sidebar-overlay')?.classList.add('active'); }
-      if (event.target.id === 'sidebar-overlay') { document.getElementById('sidebar')?.classList.remove('open'); document.getElementById('sidebar-overlay')?.classList.remove('active'); }
+      if (event.target.closest('#mobile-menu-btn')) setSidebar(true);
+      if (event.target.id === 'sidebar-overlay') setSidebar(false);
       if (event.target.classList.contains('modal-overlay')) event.target.remove();
     });
     document.addEventListener('keydown', event => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') { event.preventDefault(); openCommandPalette(); return; }
-      if (event.key === 'Escape') document.querySelector('.modal-overlay:last-of-type')?.remove();
+      if (event.key === 'Enter' || event.key === ' ') {
+        const card = event.target.closest?.('[data-clickable]');
+        if (card && event.target === card) { event.preventDefault(); card.click(); return; }
+      }
+      if (event.key === 'Escape') {
+        const overlays = document.querySelectorAll('.modal-overlay');
+        if (overlays.length) overlays[overlays.length - 1].remove();
+        else setSidebar(false);
+      }
     });
+    enhanceModals();
   };
   document.addEventListener('DOMContentLoaded', initShell);
 

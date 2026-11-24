@@ -97,7 +97,7 @@
       function fileCard(file, index) {
         const [typeName, icon] = SG.typeMap[file.type] || SG.typeMap.document;
         return `<div class="card file-card">
-          <div class="file-preview" onclick="openRecordDetail('${file.recordId}')">${file.type === 'image' && file.dataUrl ? `<img src="${file.dataUrl}" alt="${SG.esc(file.name)}">` : getIcon(icon, 26)}</div>
+          <div class="file-preview" tabindex="0" role="button" data-clickable aria-label="查看记忆：${SG.esc(file.recordTitle)}" onclick="openRecordDetail('${file.recordId}')">${file.type === 'image' && file.dataUrl ? `<img src="${file.dataUrl}" alt="${SG.esc(file.name)}">` : getIcon(icon, 26)}</div>
           <div class="file-info">
             <div class="file-name" title="${SG.esc(file.name)}">${SG.esc(file.name)}</div>
             <div class="file-meta">${typeName} · ${SG.fileSize(file.size)} · 来自「${SG.esc(file.recordTitle)}」</div>

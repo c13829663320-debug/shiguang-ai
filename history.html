@@ -65,7 +65,7 @@
             })}
             <div class="page-content narrow">
               <div class="toolbar">
-                <div class="search-box">${getIcon('search', 16)}<input class="input" id="search-input" placeholder="搜索标题、正文或标签…" value="${SG.esc(state.query)}" autocomplete="off"><div class="search-history" id="search-history" hidden></div></div>
+                <div class="search-box" role="search">${getIcon('search', 16)}<input class="input" id="search-input" type="search" aria-label="搜索记忆" placeholder="搜索标题、正文或标签…" value="${SG.esc(state.query)}" autocomplete="off"><div class="search-history" id="search-history" hidden></div></div>
                 <div class="filter-pills" id="type-pills">
                   <button class="pill ${state.type ? '' : 'active'}" data-type="">全部</button>
                   ${Object.entries(SG.typeMap).map(([key, value]) => `<button class="pill ${state.type === key ? 'active' : ''}" data-type="${key}">${value[0]}</button>`).join('')}
@@ -270,7 +270,7 @@
       function recordItem(item, withDate) {
         const [typeName, icon] = SG.typeMap[item.type] || SG.typeMap.text;
         const excerpt = item.content || item.attachments.map(file => file.name).join('、') || '暂无文字描述';
-        return `<article class="card timeline-item" onclick="openRecordDetail('${item.id}')">
+        return `<article class="card timeline-item" tabindex="0" data-clickable aria-label="打开记忆：${SG.esc(item.title)}" onclick="openRecordDetail('${item.id}')">
           <div style="min-width:0">
             <span class="memory-type">${getIcon(icon, 14)} ${typeName}${item.pinned ? ' · <span class="pin-mark">置顶</span>' : ''}${withDate ? `<span class="result-date">${SG.formatDate(item.occurredAt, false)}</span>` : ''}</span>
             <h3 class="memory-title">${SG.highlight(item.title, state.query)}</h3>

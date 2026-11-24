@@ -35,7 +35,7 @@
       const settingRow = (name, key, note) => `
         <div class="setting-row">
           <div><div class="setting-name">${name}</div><div class="setting-note">${note}</div></div>
-          <button class="switch ${MemoryStore.settings()[key] ? 'active' : ''}" data-toggle="${key}" role="switch"></button>
+          <button type="button" class="switch ${MemoryStore.settings()[key] ? 'active' : ''}" data-toggle="${key}" role="switch" aria-checked="${Boolean(MemoryStore.settings()[key])}" aria-label="${name}"></button>
         </div>`;
 
       function render() {
@@ -78,7 +78,7 @@
             <p class="settings-desc">不配置也能完整使用：助手与复盘会使用本地检索。接入 OpenAI 兼容接口（如 OpenRouter）后可获得生成式回答。</p>
             <div class="setting-row">
               <div><div class="setting-name">启用 AI 增强</div><div class="setting-note">关闭后，问答与复盘完全离线运行。</div></div>
-              <button class="switch ${settings.aiEnabled ? 'active' : ''}" data-toggle="aiEnabled" role="switch"></button>
+              <button type="button" class="switch ${settings.aiEnabled ? 'active' : ''}" data-toggle="aiEnabled" role="switch" aria-checked="${Boolean(settings.aiEnabled)}" aria-label="启用 AI 增强"></button>
             </div>
             <div class="form-stack" style="margin-top:18px">
               <div class="field">
@@ -111,7 +111,7 @@
             ${settingRow('减少动效', 'reduceMotion', '关闭卡片悬浮、弹窗动画等效果。')}
             <div class="setting-row">
               <div><div class="setting-name">夜间模式</div><div class="setting-note">深色纸感主题，夜间查看更柔和。</div></div>
-              <button class="switch ${settings.theme === 'dark' ? 'active' : ''}" data-theme-toggle role="switch" aria-label="夜间模式"></button>
+              <button type="button" class="switch ${settings.theme === 'dark' ? 'active' : ''}" data-theme-toggle role="switch" aria-checked="${settings.theme === 'dark'}" aria-label="夜间模式"></button>
             </div>
             <div class="setting-row">
               <div><div class="setting-name">标签管理</div><div class="setting-note">重命名、合并或删除标签，相关记忆会同步更新。</div></div>
@@ -119,7 +119,7 @@
             </div>
             <div class="setting-row">
               <div><div class="setting-name">搜索历史</div><div class="setting-note">最近搜索会显示在搜索框下方，最多保留 5 条。</div></div>
-              <button class="btn btn-secondary btn-sm" id="manage-search-history" aria-expanded="false">管理</button>
+              <button class="btn btn-secondary btn-sm" id="manage-search-history" aria-expanded="false" aria-controls="search-history-manage">管理</button>
             </div>
             <div class="search-history-manage" id="search-history-manage" hidden>${searchHistoryHTML()}</div>
           </div>`;
@@ -178,6 +178,7 @@
             const key = el.dataset.toggle;
             const next = MemoryStore.updateSettings({ [key]: !MemoryStore.settings()[key] });
             el.classList.toggle('active', next[key]);
+            el.setAttribute('aria-checked', String(Boolean(next[key])));
             if (key === 'reduceMotion') document.body.classList.toggle('reduce-motion', next[key]);
           };
         });
@@ -218,6 +219,7 @@
             const next = MemoryStore.settings().theme === 'dark' ? 'light' : 'dark';
             setTheme(next);
             themeToggle.classList.toggle('active', next === 'dark');
+            themeToggle.setAttribute('aria-checked', String(next === 'dark'));
             showToast(next === 'dark' ? '已切换到夜间模式' : '已切换到日间模式', 'success');
           };
         }

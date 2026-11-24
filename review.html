@@ -98,7 +98,7 @@
                     <h3 class="section-title" style="font-size:17px">本周记忆（${records.length}）</h3>
                     <div class="review-list" style="margin-top:14px">
                       ${records.length ? records.map((record, index) => `
-                        <div class="review-list-item" style="cursor:pointer" onclick="openRecordDetail('${record.id}')">
+                        <div class="review-list-item" style="cursor:pointer" tabindex="0" role="button" data-clickable aria-label="打开记忆：${SG.esc(record.title)}" onclick="openRecordDetail('${record.id}')">
                           <span>${index + 1}</span>
                           <span>${SG.esc(record.title)}<span class="muted small" style="display:block; margin-top:2px">${SG.formatDate(record.occurredAt, false)} · ${SG.esc(record.mood)}</span></span>
                         </div>`).join('') : '<p class="muted small">这一周还没有记录。</p>'}

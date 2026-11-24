@@ -45,7 +45,7 @@
         const years = new Date().getFullYear() - date.getFullYear();
         const [typeName, icon] = SG.typeMap[record.type] || SG.typeMap.text;
         const label = mode === 'same-day' ? `${years} 年前的今天` : `${date.getFullYear()} 年 ${date.getMonth() + 1} 月 ${date.getDate()} 日`;
-        return `<article class="card echo-card" onclick="openRecordDetail('${record.id}')">
+        return `<article class="card echo-card" tabindex="0" role="button" data-clickable aria-label="打开记忆：${SG.esc(record.title)}" onclick="openRecordDetail('${record.id}')">
           <div class="echo-badge">${getIcon('clock', 13)} ${label}</div>
           <h3 class="memory-title">${SG.esc(record.title)}</h3>
           <p class="memory-excerpt">${SG.esc(record.content || record.attachments.map(file => file.name).join('、') || '暂无文字描述')}</p>
