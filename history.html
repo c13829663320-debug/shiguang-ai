@@ -216,11 +216,21 @@
           b.occurredAt - a.occurredAt);
       }
 
+      function suggestKeywords(limit = 6) {
+        const seen = new Set([state.query.trim().toLowerCase()]);
+        return [...SG.searchHistoryList(), ...MemoryStore.tags().map(tag => tag.name)]
+          .filter(word => {
+            if (!word || seen.has(word.toLowerCase())) return false;
+            seen.add(word.toLowerCase()); return true;
+          }).slice(0, limit);
+      }
+
       function renderList() {
         const root = document.getElementById('timeline-root');
         if (!root) return;
         const query = state.query.trim();
         const records = sortedRecords();
+        const suggestions = suggestKeywords();
         root.innerHTML = records.length ? `
           <div class="section-head" style="margin-bottom:20px">
             <div><div class="section-kicker">${query ? 'SEARCH RESULTS' : 'TIMELINE'}</div><h2 class="section-title">${query ? `找到 ${records.length} 条相关记忆` : `共 ${records.length} 条记忆`}</h2></div>
@@ -231,10 +241,16 @@
           </div>
           ${query ? `<div class="search-results">${records.map(item => recordItem(item, true)).join('')}</div>` : `<div class="timeline">${buildTimeline(records)}</div>`}` :
           renderEmptyState({
-            icon: 'search', title: '没有匹配的记忆',
-            description: state.day ? '这一天还没有留下记忆，换个日期或清除筛选再试。' : '换个关键词，或清除筛选条件再试一次。',
-            action: `<button class="btn btn-secondary" id="clear-filters">${getIcon('refresh', 15)} 清除全部筛选</button>`
+            icon: 'search',
+            title: query ? `没有找到「${query}」` : '没有匹配的记忆',
+            description: state.day ? '这一天还没有留下记忆，换个日期或清除筛选再试。' : query ? '换个关键词，或从下面的常用词里找找。' : '换个关键词，或清除筛选条件再试一次。',
+            action: `${suggestions.length ? `<div class="suggestion-block"><span class="muted small">${query ? '试试这些关键词' : '试试这些标签'}</span><div class="suggestion-chips">${suggestions.map(word => `<button class="suggestion-chip" data-suggest="${SG.esc(word)}">${SG.esc(word)}</button>`).join('')}</div></div>` : ''}<button class="btn btn-secondary" id="clear-filters">${getIcon('refresh', 15)} 清除全部筛选</button>`
           });
+        root.querySelectorAll('[data-suggest]').forEach(btn => {
+          btn.addEventListener('click', () => {
+            state.query = btn.dataset.suggest; SG.rememberSearch(state.query); render();
+          });
+        });
         root.querySelector('#clear-filters')?.addEventListener('click', () => {
           state.query = ''; state.type = ''; state.tag = ''; state.pinned = false; state.day = null; render();
         });

@@ -267,6 +267,14 @@
       recents.innerHTML = list.map(item => `<button class="command-recent" data-recent="${esc(item)}">${getIcon('clock', 11)}${esc(item)}</button>`).join('');
       recents.hidden = !list.length;
     };
+    const suggestionsFor = query => {
+      const seen = new Set([query.toLowerCase()]);
+      return [...SG.searchHistoryList(), ...MemoryStore.tags().map(tag => tag.name)]
+        .filter(word => {
+          if (!word || seen.has(word.toLowerCase())) return false;
+          seen.add(word.toLowerCase()); return true;
+        }).slice(0, 5);
+    };
     const paint = raw => {
       const query = raw.trim();
       const records = MemoryStore.listRecords(query ? { query } : {}).slice(0, query ? 6 : 4);
@@ -281,7 +289,11 @@
         ...pages.map(page => ({ kind: 'page', href: page[1], title: page[0], titleHTML: highlight(page[0], query), meta: '页面跳转', icon: page[2], group: '页面' }))
       ];
       active = 0;
-      if (!items.length) { results.innerHTML = `<div class="command-empty">没有找到与「${esc(query)}」相关的记忆或页面。</div>`; return; }
+      if (!items.length) {
+        const suggestions = suggestionsFor(query);
+        results.innerHTML = `<div class="command-empty">没有找到与「${esc(query)}」相关的记忆或页面。${suggestions.length ? `<div class="command-suggest"><span>试试</span>${suggestions.map(word => `<button class="command-suggest-item" data-suggest="${esc(word)}">${esc(word)}</button>`).join('')}</div>` : ''}</div>`;
+        return;
+      }
       let lastGroup = '';
       results.innerHTML = items.map((item, index) => {
         const header = item.group !== lastGroup ? `<div class="command-group">${item.group}</div>` : '';
@@ -304,7 +316,14 @@
       const value = btn.dataset.recent;
       input.value = value; paintRecents(value); paint(value); input.focus();
     });
-    results.addEventListener('click', event => { const btn = event.target.closest('[data-index]'); if (btn) run(items[Number(btn.dataset.index)]); });
+    results.addEventListener('click', event => {
+      const suggest = event.target.closest('[data-suggest]');
+      if (suggest) {
+        const value = suggest.dataset.suggest;
+        input.value = value; paintRecents(value); paint(value); input.focus(); return;
+      }
+      const btn = event.target.closest('[data-index]'); if (btn) run(items[Number(btn.dataset.index)]);
+    });
     results.addEventListener('mouseover', event => { const btn = event.target.closest('[data-index]'); if (btn) { active = Number(btn.dataset.index); paintActive(); } });
     overlay.addEventListener('click', event => { if (event.target === overlay) close(); });
     document.addEventListener('keydown', onKey, true);
