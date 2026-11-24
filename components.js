@@ -494,6 +494,49 @@
     if (file.type === 'video' && url) return `<div class="attachment-preview"><video src="${url}" controls></video><p class="small muted">${esc(file.name)}</p></div>`;
     return `<div class="attachment-preview row spread"><span class="row">${getIcon('file', 20)}<span><strong class="small">${esc(file.name)}</strong><span class="file-meta" style="display:block">${fileSize(file.size)}</span></span></span>${url ? `<button class="btn btn-secondary btn-sm" onclick="SG.download('${esc(file.name)}', '${url}')">下载</button>` : ''}</div>`;
   }
+  window.openLightbox = function (images, start = 0) {
+    const list = (images || []).filter(item => item && (item.dataUrl || item.url));
+    if (!list.length) return;
+    let index = Math.min(Math.max(0, Number(start) || 0), list.length - 1);
+    const previousFocus = document.activeElement;
+    const overlay = document.createElement('div');
+    overlay.className = 'lightbox';
+    overlay.innerHTML = `<div class="lightbox-panel" role="dialog" aria-modal="true" aria-label="图片预览"><div class="lightbox-bar"><span class="lightbox-name"></span><span class="lightbox-count"></span><div class="row"><button type="button" class="btn btn-ghost btn-icon lightbox-btn" data-lightbox-download aria-label="下载图片" title="下载">${getIcon('download', 18)}</button><button type="button" class="btn btn-ghost btn-icon lightbox-btn" data-lightbox-close aria-label="关闭预览" title="关闭">${getIcon('x', 18)}</button></div></div><div class="lightbox-stage"><button type="button" class="lightbox-nav prev" data-lightbox-prev aria-label="上一张">${getIcon('left', 20)}</button><img class="lightbox-image" alt=""><button type="button" class="lightbox-nav next" data-lightbox-next aria-label="下一张">${getIcon('right', 20)}</button></div></div>`;
+    document.body.appendChild(overlay);
+    const image = overlay.querySelector('.lightbox-image');
+    const nameBox = overlay.querySelector('.lightbox-name');
+    const countBox = overlay.querySelector('.lightbox-count');
+    const prevBtn = overlay.querySelector('[data-lightbox-prev]');
+    const nextBtn = overlay.querySelector('[data-lightbox-next]');
+    const paint = () => {
+      const item = list[index];
+      image.src = item.dataUrl || item.url;
+      image.alt = item.name || '记忆图片';
+      nameBox.textContent = item.name || '记忆图片';
+      countBox.textContent = `${index + 1} / ${list.length}`;
+      const single = list.length < 2;
+      prevBtn.hidden = single; nextBtn.hidden = single;
+    };
+    const step = delta => { index = (index + delta + list.length) % list.length; paint(); };
+    const close = () => {
+      window.removeEventListener('keydown', onKey, true);
+      overlay.remove();
+      if (previousFocus && document.contains(previousFocus)) previousFocus.focus({ preventScroll: true });
+    };
+    const onKey = event => {
+      if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); close(); }
+      else if (event.key === 'ArrowLeft') { event.preventDefault(); event.stopPropagation(); step(-1); }
+      else if (event.key === 'ArrowRight') { event.preventDefault(); event.stopPropagation(); step(1); }
+    };
+    overlay.querySelector('[data-lightbox-close]').onclick = close;
+    overlay.querySelector('[data-lightbox-download]').onclick = () => { const item = list[index]; SG.download(item.name || '记忆图片', item.dataUrl || item.url); };
+    prevBtn.onclick = () => step(-1);
+    nextBtn.onclick = () => step(1);
+    overlay.addEventListener('click', event => { if (event.target === overlay) close(); });
+    window.addEventListener('keydown', onKey, true);
+    paint();
+    overlay.querySelector('[data-lightbox-close]').focus({ preventScroll: true });
+  };
   window.openRecordDetail = function (id) {
     const record = MemoryStore.getRecord(id); if (!record) { showToast('这条记忆不存在或已删除。', 'error'); return; }
     const [type, icon] = typeMap[record.type] || typeMap.text;
@@ -512,6 +555,18 @@
     const overlay = document.createElement('div'); overlay.className = 'modal-overlay';
     overlay.innerHTML = `<div class="modal modal-lg" role="dialog" aria-modal="true"><div class="modal-header"><div><span class="memory-type">${getIcon(icon, 14)} ${type}</span><h3 class="modal-title" style="margin-top:7px">${esc(record.title)}</h3></div><div class="row">${navHTML}<button class="btn btn-ghost btn-icon" data-close>${getIcon('x')}</button></div></div><div class="modal-body"><div class="detail-meta"><span>${getIcon('calendar', 13)} ${formatDate(record.occurredAt)} ${formatTime(record.occurredAt)}</span><span>${getIcon('smile', 13)} ${esc(record.mood)}</span><span>${esc(record.source)}</span></div><div class="memory-tags" style="margin-bottom:18px">${record.tags.map(tag => `<span class="tag tag-teal">${esc(tag)}</span>`).join('')}</div><div class="detail-content">${renderMarkdown(record.content || '这条记忆只有附件，没有文字描述。')}</div>${record.attachments.map(attachmentHTML).join('')}${relatedHTML}</div><div class="modal-footer detail-footer" style="justify-content:space-between"><div class="row"><button class="btn btn-ghost btn-sm" id="detail-pin">${getIcon('pin', 15)} ${record.pinned ? '取消置顶' : '置顶'}</button><button class="btn btn-ghost btn-sm" id="detail-delete">${getIcon('trash', 15)} 删除</button></div><div class="row"><button class="btn btn-secondary btn-sm" id="detail-share">${getIcon('image', 15)} 分享卡片</button><button class="btn btn-dark" id="detail-edit">${getIcon('edit', 15)} 编辑记忆</button></div></div></div>`;
     document.body.appendChild(overlay);
+    const imageAttachments = record.attachments.filter(file => file.type === 'image' && (file.dataUrl || file.url));
+    if (imageAttachments.length) {
+      overlay.querySelectorAll('.attachment-preview img').forEach((image, position) => {
+        const open = () => openLightbox(imageAttachments, position);
+        image.classList.add('zoomable');
+        image.setAttribute('role', 'button');
+        image.setAttribute('tabindex', '0');
+        image.setAttribute('aria-label', `放大查看 ${imageAttachments[position]?.name || '图片'}`);
+        image.addEventListener('click', open);
+        image.addEventListener('keydown', event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); open(); } });
+      });
+    }
     const goTo = target => { if (!target) return; overlay.remove(); openRecordDetail(target.id); };
     const onNavKey = event => {
       if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
