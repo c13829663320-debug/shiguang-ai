@@ -241,19 +241,19 @@
     const avatarHTML = avatar ? `<img src="${avatar}" alt="${esc(name)}的头像">` : esc(name.slice(0, 1));
     return `<a class="skip-link" href="#main-content">跳到主要内容</a>
       <aside class="app-sidebar" id="sidebar" aria-label="侧边栏">
-      <a class="brand" href="index.html"><span class="brand-mark"></span><span><span class="brand-name">拾光AI</span><span class="brand-sub">MEMORY, MADE VISIBLE</span></span></a>
+      <a class="brand" href="index.html"><img class="brand-mark" src="assets/shiguang-mark.svg" alt=""><span><span class="brand-name">拾光AI</span><span class="brand-sub">MEMORY, MADE VISIBLE</span></span></a>
       <button class="btn btn-primary sidebar-capture" data-action="new-record">${getIcon('plus', 17)} 留下此刻</button>
       <button class="sidebar-search" data-action="open-search">${getIcon('search', 16)}<span>搜索记忆</span><kbd>${/Mac|iPhone|iPad/.test(navigator.platform) ? '⌘K' : 'Ctrl K'}</kbd></button>
       <div class="nav-label">我的记忆</div>
-      <nav class="sidebar-nav" aria-label="主导航">${items.map(item => `<a class="nav-item ${active === item[0] ? 'active' : ''}" href="${item[3]}" ${active === item[0] ? 'aria-current="page"' : ''}>${getIcon(item[2], 19)}<span>${item[1]}</span></a>`).join('')}</nav>
-      <div class="sidebar-bottom"><div class="local-note">${getIcon('shield', 16)}<span>默认仅保存在此浏览器<br>随时导出，记忆由你掌握</span></div><div class="profile-chip"><span class="profile-avatar ${avatar ? 'has-img' : ''}">${avatarHTML}</span><span><span class="profile-name">${esc(name)}</span><span class="profile-plan">本地个人档案</span></span></div></div>
+      <nav class="sidebar-nav" aria-label="主导航">${items.map(item => `<a class="nav-item ${active === item[0] ? 'active' : ''}" href="${item[3]}" ${active === item[0] ? 'aria-current="page"' : ''}>${getIcon(item[2], 19)}<span>${item[1]}</span>${item[0] === 'assistant' ? '<span class="nav-dot" aria-hidden="true">AI</span>' : ''}</a>`).join('')}</nav>
+      <div class="sidebar-bottom"><div class="local-note"><i aria-hidden="true"></i><span><b>本地私密模式</b><small>默认仅保存在此浏览器 · 随时导出</small></span></div><div class="profile-chip"><span class="profile-avatar ${avatar ? 'has-img' : ''}">${avatarHTML}</span><span><span class="profile-name">${esc(name)}</span><span class="profile-plan">本地个人档案</span></span></div></div>
     </aside><div class="sidebar-overlay" id="sidebar-overlay"></div>`;
   };
   window.renderPageHeader = function ({ eyebrow = 'SHIGUANG AI', title, subtitle = '', actions = '' }) {
     return `<header class="page-header"><div class="row"><button class="btn btn-ghost btn-icon mobile-menu-btn" id="mobile-menu-btn" aria-label="打开导航" aria-controls="sidebar" aria-expanded="false">${getIcon('menu', 21)}</button><div class="page-heading"><div class="eyebrow">${esc(eyebrow)}</div><h1 class="page-title">${esc(title)}</h1>${subtitle ? `<p class="page-subtitle">${esc(subtitle)}</p>` : ''}</div></div><div class="page-actions">${actions}</div></header>`;
   };
-  window.renderEmptyState = function ({ icon = 'book', title, description = '', action = '' }) {
-    return `<div class="empty-state"><div class="empty-icon">${getIcon(icon, 27)}</div><h3 class="empty-title">${esc(title)}</h3><p class="empty-desc">${esc(description)}</p>${action}</div>`;
+  window.renderEmptyState = function ({ icon = 'book', illustration = '', title, description = '', action = '' }) {
+    return `<div class="empty-state">${illustration ? `<img class="empty-illustration" src="${esc(illustration)}" alt="">` : `<div class="empty-icon">${getIcon(icon, 27)}</div>`}<h3 class="empty-title">${esc(title)}</h3><p class="empty-desc">${esc(description)}</p>${action}</div>`;
   };
   window.renderRecordCard = function (record) {
     const [type, icon] = typeMap[record.type] || typeMap.text;
@@ -444,7 +444,33 @@
     });
     enhanceModals();
   };
+  // 品牌开场动画：每个浏览器仅首次访问展示，可跳过；开启减少动效时不展示。
+  function maybeShowIntro() {
+    const markSeen = () => { try { localStorage.setItem('shiguang-intro-v2', '1'); } catch (error) {} };
+    try { if (localStorage.getItem('shiguang-intro-v2') === '1') return; } catch (error) { return; }
+    try {
+      if (document.body.classList.contains('reduce-motion') || window.matchMedia('(prefers-reduced-motion: reduce)').matches) { markSeen(); return; }
+    } catch (error) { markSeen(); return; }
+    const overlay = document.createElement('div');
+    overlay.className = 'intro';
+    overlay.setAttribute('role', 'presentation');
+    overlay.setAttribute('aria-label', '拾光AI 品牌开场动画');
+    overlay.innerHTML = `<button class="intro-skip" type="button">跳过</button><div class="intro-glow" aria-hidden="true"></div><div class="intro-orbit" aria-hidden="true"><i></i></div><div class="intro-cards" aria-hidden="true"><span></span><span></span><b></b></div><div class="intro-brand" aria-hidden="true"><strong>拾光AI</strong><em>MEMORY, MADE VISIBLE</em></div>`;
+    document.body.appendChild(overlay);
+    let finished = false;
+    const finish = () => {
+      if (finished) return;
+      finished = true;
+      markSeen();
+      overlay.classList.add('done');
+      overlay.querySelector('.intro-skip').remove();
+      setTimeout(() => overlay.remove(), 800);
+    };
+    overlay.querySelector('.intro-skip').addEventListener('click', finish);
+    setTimeout(finish, 4300);
+  }
   document.addEventListener('DOMContentLoaded', initShell);
+  document.addEventListener('DOMContentLoaded', () => { maybeShowIntro(); });
 
   window.showToast = function (message, type = 'info', duration = 3200) {
     let stack = document.querySelector('.toast-stack');

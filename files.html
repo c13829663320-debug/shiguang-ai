@@ -48,12 +48,14 @@
             })}
             <div class="page-content">
               <div class="upload-zone" id="upload-zone">
-                <span class="upload-icon">${getIcon('upload', 21)}</span>
-                <div style="flex:1">
-                  <strong>添加新资料</strong>
-                  <p class="small muted" style="margin-top:3px">点击选择或把文件拖到这里，将创建一条新记忆并附上它（单个不超过 2MB）</p>
+                <img class="upload-illustration" src="assets/library-empty.jpg" alt="等待被填满的记忆资料箱">
+                <div class="upload-copy">
+                  <div class="section-kicker">DROP TO REMEMBER</div>
+                  <h2>把一份资料，放进时光里</h2>
+                  <p>点击选择，或将文件拖到这里。我们会创建一条新记忆，把资料好好地附在它身边。</p>
+                  <button class="btn btn-primary">${getIcon('plus', 15)} 选择文件</button>
+                  <small>单个文件不超过 2MB · 仅保存在当前浏览器</small>
                 </div>
-                <button class="btn btn-primary">${getIcon('plus', 15)} 选择文件</button>
                 <input type="file" id="file-input" multiple hidden accept="image/*,audio/*,video/*,.txt,.md,.csv,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx">
               </div>
 
@@ -71,7 +73,7 @@
 
               ${files.length ? `<div class="file-grid">${files.map((file, index) => fileCard(file, index)).join('')}</div>` :
                 renderEmptyState({
-                  icon: 'folder', title: '资料库还是空的',
+                  illustration: 'assets/library-empty.jpg', title: '资料库还是空的',
                   description: '在记录里添加照片、语音或文档，它们会集中出现在这里。',
                   action: `<button class="btn btn-primary" data-action="new-record">${getIcon('plus', 16)} 去添加</button>`
                 })}

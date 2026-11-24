@@ -67,10 +67,10 @@
         if (echo.mode === 'past') {
           return `<section class="section">
             <div class="section-head">
-              <div><div class="section-kicker">FROM THE PAST</div><h2 class="section-title">旧时光</h2></div>
+              <div><div class="section-kicker">FROM THE PAST</div><h2 class="section-title">旧时光，重新亮起</h2></div>
               <a class="section-link" href="history.html">去时光轴看看 ${getIcon('right', 14)}</a>
             </div>
-            <div class="memory-grid echo-grid">${echo.items.map(item => echoCard(item, 'past')).join('')}</div>
+            <div class="memory-grid echo-grid">${echo.items.slice(0, 2).map(item => echoCard(item, 'past')).join('')}<a class="memory-card visual" href="insights.html" aria-label="查看记忆关联图谱"><img src="assets/memory-constellation.jpg" alt=""><div class="visual-copy"><span>MEMORY CORNER</span><h3>散落的片段，也会相遇</h3></div></a></div>
           </section>`;
         }
         return `<section class="section">
@@ -104,14 +104,16 @@
             <div class="page-content">
               <div class="hero-grid">
                 <section class="card capture-card">
+                  <div class="aurora a1" aria-hidden="true"></div>
+                  <div class="aurora a2" aria-hidden="true"></div>
                   <div class="capture-kicker">${getIcon('sparkles', 14)} SHIGUANG · ${now.toLocaleDateString('zh-CN', { month: 'long', day: 'numeric' })} · 周${'日一二三四五六'[now.getDay()]}</div>
                   <h2 class="capture-title">${greeting()}，${SG.esc(settings.name)}。<br>今天想留下什么？</h2>
                   <p class="capture-sub">一句话也足够。它会自动归档、编目，未来的你随时可以找回。</p>
-                  <div class="quick-capture">
-                    <textarea class="textarea" id="quick-text" placeholder="比如：今天终于听懂了那段英语播客，很开心。"></textarea>
+                  <div class="quick-compose">
+                    <textarea id="quick-text" placeholder="比如：今天终于听懂了那段英语播客，很开心。" aria-label="快速记下此刻"></textarea>
                     <button class="btn btn-primary" id="quick-save">${getIcon('send', 16)} 存入时光</button>
                   </div>
-                  <div class="capture-types">
+                  <div class="capture-tools">
                     <button data-preset="image">${getIcon('image', 15)} 照片</button>
                     <button data-preset="audio">${getIcon('mic', 15)} 语音</button>
                     <button data-preset="video">${getIcon('video', 15)} 视频</button>
@@ -128,14 +130,14 @@
                 </section>
               </div>
 
-              <div class="grid-4 section">
-                <div class="card stat-card"><span class="stat-icon">${getIcon('book', 20)}</span><div class="stat-label">记忆总数</div><div class="stat-value">${stats.total}</div><div class="stat-note">条被保存的时光</div></div>
-                <div class="card stat-card"><span class="stat-icon">${getIcon('calendar', 20)}</span><div class="stat-label">本周新增</div><div class="stat-value">${stats.week}</div><div class="stat-note">条新鲜的记录</div></div>
-                <div class="card stat-card"><span class="stat-icon">${getIcon('refresh', 20)}</span><div class="stat-label">连续记录</div><div class="stat-value">${stats.streak}</div><div class="stat-note">天不断更的坚持</div></div>
-                <div class="card stat-card"><span class="stat-icon">${getIcon('folder', 20)}</span><div class="stat-label">附件资料</div><div class="stat-value">${stats.attachments}</div><div class="stat-note">份收藏的凭证</div></div>
+              <div class="grid-4 stat-row">
+                <div class="card stat-card tone-coral"><span class="stat-icon">${getIcon('book', 19)}</span><div class="stat-body"><div class="stat-label">记忆总数</div><div class="stat-value">${stats.total}</div><div class="stat-note">条被保存的时光</div></div></div>
+                <div class="card stat-card tone-gold"><span class="stat-icon">${getIcon('calendar', 19)}</span><div class="stat-body"><div class="stat-label">本周新增</div><div class="stat-value">${stats.week}</div><div class="stat-note">条新鲜的记录</div></div></div>
+                <div class="card stat-card tone-teal"><span class="stat-icon">${getIcon('refresh', 19)}</span><div class="stat-body"><div class="stat-label">连续记录</div><div class="stat-value">${stats.streak}</div><div class="stat-note">天不断更的坚持</div></div></div>
+                <div class="card stat-card tone-ink"><span class="stat-icon">${getIcon('folder', 19)}</span><div class="stat-body"><div class="stat-label">附件资料</div><div class="stat-value">${stats.attachments}</div><div class="stat-note">份收藏的凭证</div></div></div>
               </div>
 
-              ${topTag ? `<div class="insight-strip">${getIcon('sparkles', 16)}<span>最近最常见的主题是 <strong>「${SG.esc(topTag.name)}」</strong>（${topTag.count} 次），高频心情是 <strong>「${topMood ? SG.esc(topMood.name) : '平静'}」</strong>。坚持记录，它们会在周复盘中变成洞察。</span></div>` : `<div class="insight-strip">${getIcon('info', 16)}<span>还没有足够的记录。留下第一条，洞察会随之出现。</span></div>`}
+              ${topTag ? `<div class="insight-strip"><span class="insight-label">本周洞察</span><span class="insight-text">最近最常见的主题是 <strong>「${SG.esc(topTag.name)}」</strong>（${topTag.count} 次），高频心情是 <strong>「${topMood ? SG.esc(topMood.name) : '平静'}」</strong>。坚持记录，它们会在周复盘中变成洞察。</span><a class="insight-link" href="insights.html" aria-label="查看主题洞察">${getIcon('right', 16)}</a></div>` : `<div class="insight-strip"><span class="insight-label">本周洞察</span><span class="insight-text">还没有足够的记录。留下第一条，洞察会随之出现。</span><a class="insight-link" href="insights.html" aria-label="查看主题洞察">${getIcon('right', 16)}</a></div>`}
 
               ${echoSection(echo)}
 

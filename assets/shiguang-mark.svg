@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="title desc">
+  <title id="title">拾光AI 品牌标记</title>
+  <desc id="desc">两张记忆卡片被一条金色光轨连接</desc>
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="34" y="26" width="58" height="72" rx="14" fill="#2A6F6A" transform="rotate(-8 63 62)" opacity=".92"/>
+    <rect x="43" y="31" width="58" height="72" rx="14" fill="#F6F3ED" stroke="#1E2623" stroke-width="5"/>
+    <path d="M51 71c10-14 18-17 26-7 7 8 12 8 20-2" stroke="#E76F51" stroke-width="6"/>
+    <path d="M18 81c15 23 73 30 94-1 14-21-5-42-23-39" stroke="#D6A84B" stroke-width="5"/>
+    <circle cx="110" cy="75" r="8" fill="#D6A84B" stroke="#F6F3ED" stroke-width="3"/>
+  </g>
+</svg>

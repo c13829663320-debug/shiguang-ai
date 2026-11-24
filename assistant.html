@@ -43,12 +43,17 @@
                 <span class="badge">${MemoryAPI.configured() ? `${getIcon('sparkles', 13)} AI 增强` : `${getIcon('shield', 13)} 本地检索`}</span>`
             })}
             <div class="page-content">
+              <section class="assistant-hero">
+                <img src="assets/memory-constellation.jpg" alt="记忆星图">
+                <div class="assistant-overlay">
+                  <div class="eyebrow">PRIVATE MEMORY INTELLIGENCE</div>
+                  <h2>${SG.esc(settings.name)}，关于你的记忆，<br>可以问我任何问题。</h2>
+                  <p>回答只来自你保存过的记录；每条结论都会标注依据，可回溯、可追问。</p>
+                  <span class="local-badge"><i aria-hidden="true"></i>${MemoryAPI.configured() ? 'AI 增强已开启 · 本地检索兜底' : '本地检索已开启'}</span>
+                </div>
+              </section>
               <div class="assistant-layout">
                 <div class="card chat-panel">
-                  <div class="chat-welcome">
-                    <h2>你好，${SG.esc(settings.name)}。关于你的记忆，可以问我任何问题。</h2>
-                    <p>我会先在你的记忆库里检索相关记录，再组织回答；每条回答都会标注依据。</p>
-                  </div>
                   <div class="chat-messages" id="chat-messages"></div>
                   <div class="chat-compose">
                     <div class="chat-compose-box">
