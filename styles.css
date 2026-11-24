@@ -608,6 +608,10 @@ a.heatmap-cell:hover { transform: translateY(-1px); box-shadow: 0 0 0 1.5px var(
 .attachment-preview { margin-top: 20px; padding: 15px; border: 1px solid var(--line); border-radius: 10px; background: var(--paper); }
 .attachment-preview img { max-height: 360px; margin: auto; object-fit: contain; }
 .attachment-preview audio, .attachment-preview video { width: 100%; max-height: 360px; }
+.editor-dropzone { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 10px; padding: 14px 12px; border: 1px dashed var(--line); border-radius: 12px; background: var(--paper); color: var(--muted); font-size: 11px; text-align: center; transition: border-color .18s, background .18s, color .18s; }
+.editor-dropzone svg { flex-shrink: 0; }
+.editor-dropzone.active { border-color: var(--gold); background: rgba(214, 168, 75, .12); color: var(--ink); }
+[data-theme="dark"] .editor-dropzone.active { background: rgba(214, 168, 75, .16); color: var(--ink); }
 .editor-attachments { display: flex; flex-direction: column; gap: 7px; }
 .editor-attachment { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 8px; background: var(--paper); font-size: 11px; }
 .editor-attachment span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

@@ -734,16 +734,88 @@
     let attachments = [...record.attachments];
     const dateValue = new Date(record.occurredAt - new Date(record.occurredAt).getTimezoneOffset() * 60000).toISOString().slice(0, 16);
     const overlay = document.createElement('div'); overlay.className = 'modal-overlay';
-    overlay.innerHTML = `<div class="modal modal-lg" role="dialog" aria-modal="true"><form id="record-form"><div class="modal-header"><div><div class="eyebrow">${existing ? 'EDIT MEMORY' : 'CAPTURE THE MOMENT'}</div><h3 class="modal-title">${existing ? '编辑记忆' : '此刻，值得留下'}</h3></div><button class="btn btn-ghost btn-icon" type="button" data-close>${getIcon('x')}</button></div><div class="modal-body"><div class="form-stack"><div class="field"><label class="field-label" for="record-title">标题</label><input class="input" id="record-title" maxlength="80" value="${esc(record.title)}" placeholder="给这段记忆一个名字，留空将自动截取正文"></div><div class="field"><label class="field-label" for="record-content">正文</label><textarea class="textarea" id="record-content" style="min-height:160px" placeholder="发生了什么？当时的你在想什么？">${esc(record.content)}</textarea></div><div class="form-grid"><div class="field"><label class="field-label" for="record-type">记忆类型</label><select class="select" id="record-type">${Object.entries(typeMap).map(([key, value]) => `<option value="${key}" ${record.type === key ? 'selected' : ''}>${value[0]}</option>`).join('')}</select></div><div class="field"><label class="field-label" for="record-date">发生时间</label><input class="input" id="record-date" type="datetime-local" value="${dateValue}" required></div><div class="field"><label class="field-label" for="record-mood">此刻心情</label><select class="select" id="record-mood">${['平静', '愉快', '有收获', '专注', '充实', '轻松', '期待', '温暖', '兴奋', '反思', '疲惫', '低落'].map(mood => `<option ${record.mood === mood ? 'selected' : ''}>${mood}</option>`).join('')}</select></div><div class="field"><label class="field-label" for="record-tags">标签</label><input class="input" id="record-tags" value="${esc(record.tags.join('，'))}" placeholder="学习，阅读（用逗号分隔）"></div></div><div class="field"><span class="field-label">附件</span><div class="row wrap"><button class="btn btn-secondary btn-sm" type="button" id="add-attachment">${getIcon('upload', 14)} 添加文件</button><button class="btn btn-secondary btn-sm" type="button" id="record-audio">${getIcon('mic', 14)} 录制语音</button><span class="field-hint">照片 / 语音 / 视频 / 文档，单个不超过 2MB</span></div><input type="file" id="attachment-input" multiple hidden accept="image/*,audio/*,video/*,.txt,.md,.csv,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx"><div class="editor-attachments" id="editor-attachments"></div></div></div></div><div class="modal-footer"><button class="btn btn-secondary" type="button" data-close>取消</button><button class="btn btn-primary" type="submit" id="save-record">${getIcon('check', 16)} ${existing ? '保存修改' : '存入时光'}</button></div></form></div>`;
+    overlay.innerHTML = `<div class="modal modal-lg" role="dialog" aria-modal="true"><form id="record-form"><div class="modal-header"><div><div class="eyebrow">${existing ? 'EDIT MEMORY' : 'CAPTURE THE MOMENT'}</div><h3 class="modal-title">${existing ? '编辑记忆' : '此刻，值得留下'}</h3></div><button class="btn btn-ghost btn-icon" type="button" data-close>${getIcon('x')}</button></div><div class="modal-body"><div class="form-stack"><div class="field"><label class="field-label" for="record-title">标题</label><input class="input" id="record-title" maxlength="80" value="${esc(record.title)}" placeholder="给这段记忆一个名字，留空将自动截取正文"></div><div class="field"><label class="field-label" for="record-content">正文</label><textarea class="textarea" id="record-content" style="min-height:160px" placeholder="发生了什么？当时的你在想什么？">${esc(record.content)}</textarea></div><div class="form-grid"><div class="field"><label class="field-label" for="record-type">记忆类型</label><select class="select" id="record-type">${Object.entries(typeMap).map(([key, value]) => `<option value="${key}" ${record.type === key ? 'selected' : ''}>${value[0]}</option>`).join('')}</select></div><div class="field"><label class="field-label" for="record-date">发生时间</label><input class="input" id="record-date" type="datetime-local" value="${dateValue}" required></div><div class="field"><label class="field-label" for="record-mood">此刻心情</label><select class="select" id="record-mood">${['平静', '愉快', '有收获', '专注', '充实', '轻松', '期待', '温暖', '兴奋', '反思', '疲惫', '低落'].map(mood => `<option ${record.mood === mood ? 'selected' : ''}>${mood}</option>`).join('')}</select></div><div class="field"><label class="field-label" for="record-tags">标签</label><input class="input" id="record-tags" value="${esc(record.tags.join('，'))}" placeholder="学习，阅读（用逗号分隔）"></div></div><div class="field"><span class="field-label">附件</span><div class="row wrap"><button class="btn btn-secondary btn-sm" type="button" id="add-attachment">${getIcon('upload', 14)} 添加文件</button><button class="btn btn-secondary btn-sm" type="button" id="record-audio">${getIcon('mic', 14)} 录制语音</button><button class="btn btn-secondary btn-sm" type="button" id="record-dictate" aria-pressed="false" title="把说的话转成正文">${getIcon('sparkles', 14)} 语音转文字</button><span class="field-hint">照片 / 语音 / 视频 / 文档，单个不超过 2MB</span></div><input type="file" id="attachment-input" multiple hidden accept="image/*,audio/*,video/*,.txt,.md,.csv,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx"><div class="editor-dropzone" id="editor-dropzone">${getIcon('upload', 15)}<span>把文件拖到这里，或按 Ctrl / ⌘ + V 粘贴图片</span></div><div class="editor-attachments" id="editor-attachments"></div></div></div></div><div class="modal-footer"><button class="btn btn-secondary" type="button" data-close>取消</button><button class="btn btn-primary" type="submit" id="save-record">${getIcon('check', 16)} ${existing ? '保存修改' : '存入时光'}</button></div></form></div>`;
     document.body.appendChild(overlay);
     const renderAttachments = () => { overlay.querySelector('#editor-attachments').innerHTML = attachments.map((file, index) => `<div class="editor-attachment">${getIcon(typeMap[file.type]?.[1] || 'file', 15)}<span>${esc(file.name)} · ${fileSize(file.size)}</span><button type="button" class="btn btn-ghost btn-icon btn-sm" data-remove-file="${index}" aria-label="移除附件">${getIcon('x', 14)}</button></div>`).join(''); };
     renderAttachments();
-    overlay.querySelectorAll('[data-close]').forEach(btn => btn.onclick = () => overlay.remove());
-    overlay.querySelector('#add-attachment').onclick = () => overlay.querySelector('#attachment-input').click();
-    overlay.querySelector('#attachment-input').onchange = async event => {
-      try { for (const file of event.target.files) attachments.push(await fileToAttachment(file)); renderAttachments(); }
-      catch (error) { showToast(error.message, 'error', 5000); }
+    let recognition = null; let dictating = false;
+    const cleanups = [];
+    const cleanupRuntime = () => {
+      cleanups.splice(0).forEach(fn => { try { fn(); } catch (error) { console.warn(error); } });
+      if (recognition) { try { recognition.onend = null; recognition.stop(); } catch (error) { console.warn(error); } recognition = null; }
     };
+    const closeEditor = () => { cleanupRuntime(); overlay.remove(); };
+    const onEsc = event => { if (event.key === 'Escape') cleanupRuntime(); };
+    document.addEventListener('keydown', onEsc, true);
+    cleanups.push(() => document.removeEventListener('keydown', onEsc, true));
+    const addFiles = async files => {
+      const list = Array.from(files || []).filter(Boolean);
+      if (!list.length) return;
+      let added = 0;
+      for (const file of list) {
+        try { attachments.push(await fileToAttachment(file)); added += 1; }
+        catch (error) { showToast(error.message, 'error', 5000); }
+      }
+      if (added) { renderAttachments(); showToast(`已添加 ${added} 个附件`, 'success'); }
+    };
+    overlay.querySelectorAll('[data-close]').forEach(btn => btn.onclick = closeEditor);
+    overlay.querySelector('#add-attachment').onclick = () => overlay.querySelector('#attachment-input').click();
+    overlay.querySelector('#attachment-input').onchange = event => { addFiles(event.target.files); event.target.value = ''; };
+    const form = overlay.querySelector('#record-form');
+    const dropzone = overlay.querySelector('#editor-dropzone');
+    const hasFiles = event => Array.from(event.dataTransfer?.types || []).includes('Files');
+    const onDragOver = event => { if (!hasFiles(event)) return; event.preventDefault(); dropzone.classList.add('active'); };
+    const onDragLeave = event => { if (!event.relatedTarget || !form.contains(event.relatedTarget)) dropzone.classList.remove('active'); };
+    const onDrop = event => { if (!event.dataTransfer) return; event.preventDefault(); dropzone.classList.remove('active'); addFiles(event.dataTransfer.files); };
+    ['dragenter', 'dragover'].forEach(type => form.addEventListener(type, onDragOver));
+    form.addEventListener('dragleave', onDragLeave);
+    form.addEventListener('drop', onDrop);
+    const onPaste = event => {
+      if (!document.body.contains(overlay)) { document.removeEventListener('paste', onPaste); return; }
+      const files = Array.from(event.clipboardData?.files || []).filter(file => /^(image|audio|video)\//.test(file.type));
+      if (!files.length) return;
+      event.preventDefault(); addFiles(files);
+    };
+    document.addEventListener('paste', onPaste);
+    cleanups.push(() => document.removeEventListener('paste', onPaste));
+    const dictateBtn = overlay.querySelector('#record-dictate');
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    dictateBtn.onclick = () => {
+      if (!SpeechRecognition) { showToast('当前浏览器不支持语音转文字，可先录制语音留档。', 'error', 4500); return; }
+      if (dictating) { recognition?.stop(); return; }
+      try {
+        recognition = new SpeechRecognition();
+        recognition.lang = 'zh-CN'; recognition.interimResults = false; recognition.continuous = true;
+        recognition.onresult = event => {
+          let text = '';
+          for (let index = event.resultIndex; index < event.results.length; index += 1) {
+            if (event.results[index].isFinal) text += event.results[index][0].transcript;
+          }
+          if (!text.trim()) return;
+          const area = overlay.querySelector('#record-content');
+          area.value += (area.value && !/[\s\n]$/.test(area.value) ? ' ' : '') + text.trim();
+          area.scrollTop = area.scrollHeight;
+        };
+        recognition.onerror = event => {
+          const message = event.error === 'not-allowed' ? '麦克风权限被拒绝，请在地址栏允许后重试。' : event.error === 'no-speech' ? '没有听到声音，请靠近麦克风再试一次。' : `语音识别中断（${event.error}）。`;
+          showToast(message, 'error', 4500);
+        };
+        recognition.onend = () => {
+          dictating = false;
+          dictateBtn.classList.remove('btn-danger'); dictateBtn.setAttribute('aria-pressed', 'false');
+          dictateBtn.innerHTML = `${getIcon('sparkles', 14)} 语音转文字`;
+        };
+        recognition.start(); dictating = true;
+        dictateBtn.classList.add('btn-danger'); dictateBtn.setAttribute('aria-pressed', 'true');
+        dictateBtn.innerHTML = `${getIcon('mic', 14)} 正在聆听 · 点击结束`;
+      } catch (error) { showToast(`语音识别未能启动：${error.message}`, 'error', 4500); }
+    };
+    form.addEventListener('keydown', event => {
+      if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+        event.preventDefault();
+        if (form.requestSubmit) form.requestSubmit(); else form.dispatchEvent(new Event('submit', { cancelable: true }));
+      }
+    });
     overlay.querySelector('#editor-attachments').onclick = event => { const btn = event.target.closest('[data-remove-file]'); if (btn) { attachments.splice(Number(btn.dataset.removeFile), 1); renderAttachments(); } };
     let mediaRecorder = null;
     overlay.querySelector('#record-audio').onclick = async event => {
@@ -766,6 +838,7 @@
     overlay.querySelector('#record-form').onsubmit = async event => {
       event.preventDefault();
       if (mediaRecorder?.state === 'recording') { showToast('请先停止录音再保存。', 'error'); return; }
+      if (dictating) recognition?.stop();
       const content = overlay.querySelector('#record-content').value.trim();
       if (!content && !attachments.length) { showToast('写一点内容，或添加一个附件后再保存。', 'error'); return; }
       const button = overlay.querySelector('#save-record'); button.disabled = true; button.textContent = '保存中…';
@@ -779,7 +852,7 @@
       };
       try {
         const saved = existing ? MemoryStore.updateRecord(id, payload) : MemoryStore.createRecord(payload);
-        overlay.remove(); showToast(existing ? '修改已保存' : '这一刻，已存入时光', 'success'); onSaved?.(saved);
+        closeEditor(); showToast(existing ? '修改已保存' : '这一刻，已存入时光', 'success'); onSaved?.(saved);
       } catch (error) { showToast(error.message, 'error', 5000); button.disabled = false; button.textContent = '重新保存'; }
     };
     setTimeout(() => overlay.querySelector('#record-title').focus(), 50);
