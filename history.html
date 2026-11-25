@@ -111,7 +111,10 @@
           const btn = event.target.closest('[data-tag]'); if (!btn) return;
           state.tag = btn.dataset.tag; render();
         });
-        document.getElementById('export-center').onclick = () => openExportCenter();
+        document.getElementById('export-center').onclick = () => {
+          if (typeof window.openExportCenter !== 'function') { showToast('页面资源正在更新，请刷新后重试。', 'info'); return; }
+          openExportCenter();
+        };
         renderCalendar();
         renderList();
       }
