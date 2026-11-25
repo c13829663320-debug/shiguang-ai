@@ -12,14 +12,14 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" type="image/png" href="icons/icon-192.png">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles.css?v=20">
 </head>
 <body>
   <div id="app"></div>
 
-  <script src="mock.js"></script>
-  <script src="api.js"></script>
-  <script src="components.js"></script>
+  <script src="mock.js?v=20"></script>
+  <script src="api.js?v=20"></script>
+  <script src="components.js?v=20"></script>
   <script>
     (function () {
       const app = document.getElementById('app');
@@ -148,6 +148,10 @@
               <input type="file" id="import-input" accept="application/json,.json" hidden>
             </div>
             <div class="setting-row">
+              <div><div class="setting-name">回收站</div><div class="setting-note">删除的记忆会保留 30 天，可恢复或彻底清除。</div></div>
+              <div class="row"><span class="muted small" id="trash-count">${MemoryStore.trash().length} 条</span><button class="btn btn-secondary btn-sm" id="open-trash">管理</button></div>
+            </div>
+            <div class="setting-row">
               <div><div class="setting-name">恢复示例数据</div><div class="setting-note">保留当前设置，重新载入示例记忆。</div></div>
               <button class="btn btn-secondary btn-sm" id="reset-demo">恢复</button>
             </div>
@@ -223,6 +227,7 @@
         }
 
         on('open-tag-manager', () => openTagManager());
+        on('open-trash', () => openTrashManager());
 
         const themeToggle = app.querySelector('[data-theme-toggle]');
         if (themeToggle) {

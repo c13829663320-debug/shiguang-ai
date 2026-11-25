@@ -2,6 +2,7 @@
 (function () {
   const STORAGE_KEY = 'shiguang-ai-memory-v2';
   const DAY = 86400000;
+  const TRASH_DAYS = 30;
   const clone = (value) => JSON.parse(JSON.stringify(value));
   const uid = (prefix) => `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
   const atDay = (offset, hour = 9, minute = 0) => {
@@ -44,7 +45,7 @@
       tags: row[4], mood: row[5], source: row[6], pinned: index === 0 || index === 7,
       attachments: [], isSample: true
     }));
-    return { version: 2, records, reviews: [], chats: [], settings: clone(defaultSettings), createdAt: Date.now() };
+    return { version: 2, records, reviews: [], chats: [], trash: [], settings: clone(defaultSettings), createdAt: Date.now() };
   }
 
   function load() {
@@ -58,6 +59,7 @@
         records: parsed.records,
         reviews: Array.isArray(parsed.reviews) ? parsed.reviews : [],
         chats: Array.isArray(parsed.chats) ? parsed.chats : [],
+        trash: Array.isArray(parsed.trash) ? parsed.trash.filter(item => item && item.id && (!item.deletedAt || Date.now() - Number(item.deletedAt) < TRASH_DAYS * DAY)) : [],
         settings: { ...defaultSettings, ...(parsed.settings || {}) }
       };
     } catch (error) {
@@ -164,7 +166,27 @@
       db.records[index] = normalizeRecord({ ...db.records[index], ...patch }, db.records[index]);
       persist(); return clone(db.records[index]);
     },
-    deleteRecord(id) { db.records = db.records.filter(item => item.id !== id); persist(); },
+    deleteRecord(id) {
+      const index = db.records.findIndex(item => item.id === id);
+      if (index < 0) return null;
+      const [record] = db.records.splice(index, 1);
+      record.deletedAt = Date.now();
+      db.trash.unshift(record);
+      persist(); return clone(record);
+    },
+    trash() { return clone(db.trash).sort((a, b) => b.deletedAt - a.deletedAt); },
+    restoreRecord(id) {
+      const index = db.trash.findIndex(item => item.id === id);
+      if (index < 0) return null;
+      const [record] = db.trash.splice(index, 1);
+      delete record.deletedAt;
+      if (db.records.some(item => item.id === record.id)) record.id = uid('memory');
+      record.updatedAt = Date.now();
+      db.records.unshift(record);
+      persist(); return clone(record);
+    },
+    purgeRecord(id) { db.trash = db.trash.filter(item => item.id !== id); persist(); },
+    emptyTrash() { const count = db.trash.length; db.trash = []; persist(); return count; },
     togglePin(id) {
       const record = db.records.find(item => item.id === id);
       if (!record) return null;
@@ -464,6 +486,7 @@
       const exported = clone(db);
       exported.settings.apiKey = '';
       exported.exportedAt = Date.now();
+      delete exported.trash;
       return JSON.stringify(exported, null, 2);
     },
     exportMarkdown(records) {
@@ -481,8 +504,8 @@
       if (!incoming || !Array.isArray(incoming.records)) throw new Error('这不是有效的拾光AI备份文件：缺少 records 数组。');
       const now = Date.now();
       const imported = incoming.records.map(item => normalizeRecord({ ...item, isSample: false }, null));
-      if (mode === 'replace') db.records = [];
-      const ids = new Set(db.records.map(item => item.id));
+      if (mode === 'replace') { db.records = []; db.trash = []; }
+      const ids = new Set([...db.records, ...db.trash].map(item => item.id));
       imported.forEach(item => {
         if (ids.has(item.id)) item.id = uid('memory');
         item.createdAt = Number(item.createdAt) || now;
@@ -492,7 +515,7 @@
       persist();
       return imported.length;
     },
-    clearAll() { db = { version: 2, records: [], reviews: [], chats: [], settings: clone(db.settings), createdAt: Date.now() }; persist(); },
+    clearAll() { db = { version: 2, records: [], reviews: [], chats: [], trash: [], settings: clone(db.settings), createdAt: Date.now() }; persist(); },
     resetDemo() { const settings = clone(db.settings); db = seedData(); db.settings = settings; persist(); }
   };
 

@@ -12,14 +12,14 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" type="image/png" href="icons/icon-192.png">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles.css?v=20">
 </head>
 <body>
   <div id="app"></div>
 
-  <script src="mock.js"></script>
-  <script src="api.js"></script>
-  <script src="components.js"></script>
+  <script src="mock.js?v=20"></script>
+  <script src="api.js?v=20"></script>
+  <script src="components.js?v=20"></script>
   <script>
     (function () {
       const app = document.getElementById('app');
@@ -305,11 +305,10 @@
       window.removeRecord = (id, event) => {
         event.stopPropagation();
         const record = MemoryStore.getRecord(id);
-        showConfirm({
-          title: '删除这条记忆？',
-          message: `「${record ? record.title : ''}」及其附件将被永久删除，建议先导出备份。`,
-          confirmText: '永久删除',
-          onConfirm: () => { MemoryStore.deleteRecord(id); showToast('记忆已删除', 'success'); }
+        MemoryStore.deleteRecord(id);
+        showToast(`「${record ? record.title : '这条记忆'}」已移到回收站`, 'success', 5200, {
+          label: '撤销',
+          onClick: () => { MemoryStore.restoreRecord(id); showToast('已恢复这条记忆', 'success'); }
         });
       };
 

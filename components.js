@@ -473,12 +473,16 @@
   document.addEventListener('DOMContentLoaded', initShell);
   document.addEventListener('DOMContentLoaded', () => { maybeShowIntro(); });
 
-  window.showToast = function (message, type = 'info', duration = 3200) {
+  window.showToast = function (message, type = 'info', duration = 3200, action = null) {
     let stack = document.querySelector('.toast-stack');
     if (!stack) { stack = document.createElement('div'); stack.className = 'toast-stack'; document.body.appendChild(stack); }
     const toast = document.createElement('div'); toast.className = `toast ${type}`;
-    toast.innerHTML = `${getIcon(type === 'error' ? 'alert' : type === 'success' ? 'check' : 'info', 17)}<span>${esc(message)}</span>`;
-    stack.appendChild(toast); setTimeout(() => toast.remove(), duration);
+    toast.innerHTML = `${getIcon(type === 'error' ? 'alert' : type === 'success' ? 'check' : 'info', 17)}<span>${esc(message)}</span>${action ? `<button class="toast-action" type="button">${esc(action.label)}</button>` : ''}`;
+    stack.appendChild(toast);
+    if (action) {
+      toast.querySelector('.toast-action').onclick = () => { action.onClick?.(); toast.remove(); };
+    }
+    setTimeout(() => toast.remove(), duration);
   };
   window.showConfirm = function ({ title, message, confirmText = '确认', onConfirm, danger = true }) {
     const overlay = document.createElement('div'); overlay.className = 'modal-overlay';
@@ -585,7 +589,15 @@
     overlay.querySelector('#detail-export').onclick = () => { document.removeEventListener('keydown', onNavKey, true); overlay.remove(); openMemoryLongImage(id); };
     overlay.querySelector('#detail-edit').onclick = () => { document.removeEventListener('keydown', onNavKey, true); overlay.remove(); openRecordEditor(id); };
     overlay.querySelector('#detail-pin').onclick = () => { document.removeEventListener('keydown', onNavKey, true); MemoryStore.togglePin(id); overlay.remove(); showToast('置顶状态已更新', 'success'); };
-    overlay.querySelector('#detail-delete').onclick = () => { document.removeEventListener('keydown', onNavKey, true); overlay.remove(); showConfirm({ title: '删除这条记忆？', message: `「${record.title}」及其附件将被永久删除，建议先导出备份。`, confirmText: '永久删除', onConfirm: () => { MemoryStore.deleteRecord(id); showToast('记忆已删除', 'success'); } }); };
+    overlay.querySelector('#detail-delete').onclick = () => {
+      document.removeEventListener('keydown', onNavKey, true);
+      overlay.remove();
+      MemoryStore.deleteRecord(id);
+      showToast(`「${record.title}」已移到回收站`, 'success', 5200, {
+        label: '撤销',
+        onClick: () => { MemoryStore.restoreRecord(id); showToast('已恢复这条记忆', 'success'); }
+      });
+    };
   };
 
   function wrapCanvasText(ctx, text, maxWidth, maxLines) {
@@ -1129,6 +1141,49 @@
       });
     }
 
+    renderList();
+  };
+
+  window.openTrashManager = function () {
+    const overlay = document.createElement('div'); overlay.className = 'modal-overlay';
+    overlay.innerHTML = `<div class="modal modal-tags modal-trash" role="dialog" aria-modal="true"><div class="modal-header"><div><div class="eyebrow">RECYCLE BIN</div><h3 class="modal-title">回收站</h3></div><button class="btn btn-ghost btn-icon" data-close>${getIcon('x')}</button></div><div class="modal-body"><p class="tag-manager-desc">删除的记忆会保留 30 天，可随时恢复；永久删除后无法找回。</p><div class="trash-list" id="trash-list"></div></div><div class="modal-footer"><span class="tag-manager-total" id="trash-total"></span><button class="btn btn-ghost btn-sm" id="trash-clear">${getIcon('trash', 14)} 清空回收站</button><button class="btn btn-secondary" data-close>完成</button></div></div>`;
+    document.body.appendChild(overlay);
+    overlay.querySelectorAll('[data-close]').forEach(btn => btn.onclick = () => overlay.remove());
+    const list = overlay.querySelector('#trash-list');
+    const total = overlay.querySelector('#trash-total');
+    const clearBtn = overlay.querySelector('#trash-clear');
+    const syncCount = () => { const el = document.getElementById('trash-count'); if (el) el.textContent = `${MemoryStore.trash().length} 条`; };
+
+    function renderList() {
+      const items = MemoryStore.trash();
+      total.textContent = `${items.length} 条 · 最多保留 30 天`;
+      clearBtn.disabled = !items.length;
+      syncCount();
+      if (!items.length) { list.innerHTML = `<div class="trash-empty">回收站是空的。<br>删除的记忆会先来到这里，30 天内都可以恢复。</div>`; return; }
+      list.innerHTML = items.map(record => `<div class="trash-row"><div class="trash-main"><div class="trash-title">${esc(record.title)}</div><div class="trash-meta">${formatDate(record.occurredAt)} · 删除于 ${formatDate(record.deletedAt)}</div><p class="trash-excerpt">${esc(record.content || '这条记忆只有附件。')}</p></div><div class="trash-actions"><button class="btn btn-ghost btn-sm" data-restore="${esc(record.id)}">${getIcon('refresh', 13)} 恢复</button><button class="btn btn-ghost btn-sm" data-purge="${esc(record.id)}">${getIcon('trash', 13)} 永久删除</button></div></div>`).join('');
+      list.querySelectorAll('[data-restore]').forEach(btn => btn.onclick = () => {
+        const restored = MemoryStore.restoreRecord(btn.dataset.restore);
+        renderList();
+        if (restored) showToast(`已恢复「${restored.title}」`, 'success');
+      });
+      list.querySelectorAll('[data-purge]').forEach(btn => btn.onclick = () => {
+        const record = items.find(item => item.id === btn.dataset.purge);
+        if (!record) return;
+        showConfirm({
+          title: '永久删除这条记忆？', message: `「${record.title}」及其附件将无法找回。`, confirmText: '永久删除',
+          onConfirm: () => { MemoryStore.purgeRecord(record.id); renderList(); showToast('已永久删除', 'success'); }
+        });
+      });
+    }
+
+    clearBtn.onclick = () => {
+      const count = MemoryStore.trash().length;
+      if (!count) return;
+      showConfirm({
+        title: '清空回收站？', message: `${count} 条记忆及其附件将被永久删除，无法找回。`, confirmText: '清空',
+        onConfirm: () => { const removed = MemoryStore.emptyTrash(); renderList(); showToast(`已永久删除 ${removed} 条记忆`, 'success'); }
+      });
+    };
     renderList();
   };
 
