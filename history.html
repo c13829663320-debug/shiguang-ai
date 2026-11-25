@@ -35,7 +35,6 @@
           cal = { year: picked.getFullYear(), month: picked.getMonth() };
         }
       }
-      const dateStamp = () => new Date().toISOString().slice(0, 10);
       const debounce = (fn, ms) => { let timer; return (...args) => { clearTimeout(timer); timer = setTimeout(() => fn(...args), ms); }; };
 
       function filtered() {
@@ -59,8 +58,7 @@
             ${renderPageHeader({
               title: '时光轴', subtitle: '所有记忆，按发生的时间排列',
               actions: `
-                <button class="btn btn-secondary" id="export-md">${getIcon('download', 16)}<span class="optional"> 导出 Markdown</span></button>
-                <button class="btn btn-secondary" id="export-json">${getIcon('download', 16)}<span class="optional"> 导出 JSON</span></button>
+                <button class="btn btn-secondary" id="export-center">${getIcon('download', 16)}<span class="optional"> 导出</span></button>
                 <button class="btn btn-primary" data-action="new-record">${getIcon('plus', 16)} 记一笔</button>`
             })}
             <div class="page-content narrow">
@@ -113,14 +111,7 @@
           const btn = event.target.closest('[data-tag]'); if (!btn) return;
           state.tag = btn.dataset.tag; render();
         });
-        document.getElementById('export-md').onclick = () => {
-          SG.download(`拾光AI-记忆-${dateStamp()}.md`, MemoryStore.exportMarkdown(filtered()));
-          showToast('已导出当前筛选下的 Markdown', 'success');
-        };
-        document.getElementById('export-json').onclick = () => {
-          SG.download(`拾光AI-备份-${dateStamp()}.json`, MemoryStore.exportJSON());
-          showToast('已导出 JSON 备份（不含密钥）', 'success');
-        };
+        document.getElementById('export-center').onclick = () => openExportCenter();
         renderCalendar();
         renderList();
       }

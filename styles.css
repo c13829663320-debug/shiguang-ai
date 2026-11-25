@@ -567,6 +567,33 @@ a.heatmap-cell:hover { transform: translateY(-1px); box-shadow: 0 0 0 1.5px var(
 .share-preview { display: grid; place-items: center; padding: 10px; border: 1px solid var(--line); border-radius: 12px; background: var(--paper); }
 .share-preview img { width: auto; max-height: 62vh; border-radius: 6px; box-shadow: var(--shadow); }
 .share-hint { margin-top: 12px; color: var(--muted); font-size: 11px; }
+/* 导出中心 */
+.export-modal { width: min(100%, 720px); }
+.export-section { margin-bottom: 22px; }
+.export-section:last-of-type { margin-bottom: 0; }
+.export-label { margin-bottom: 10px; color: var(--muted); font-size: 10px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; }
+.export-sub { margin-top: 12px; }
+.export-dates { gap: 10px; }
+.export-date { display: flex; flex-direction: column; gap: 5px; color: var(--muted); font-size: 11px; }
+.export-date .input { min-width: 150px; }
+.export-quick { margin-top: 8px; }
+.export-formats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.export-format { display: flex; align-items: flex-start; gap: 10px; padding: 13px 14px; border: 1px solid var(--line); border-radius: 11px; background: var(--paper); color: var(--ink-soft); text-align: left; transition: border .18s, background .18s, color .18s; }
+.export-format:hover { border-color: var(--teal); }
+.export-format.active { border-color: var(--teal); background: var(--teal-soft); color: var(--teal); }
+.export-format > svg { flex-shrink: 0; margin-top: 2px; }
+.export-format-text strong { display: block; color: var(--ink); font-size: 13px; }
+.export-format.active .export-format-text strong { color: var(--teal); }
+.export-format-text span { display: block; margin-top: 3px; color: var(--muted); font-size: 10.5px; line-height: 1.5; }
+.export-summary { padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--paper-deep); color: var(--ink-soft); font-size: 11.5px; line-height: 1.6; }
+.export-summary.warn { border-color: rgba(214, 168, 75, .45); background: var(--gold-soft); color: var(--coral-dark); }
+.export-note { margin-right: auto; color: var(--muted); font-size: 10.5px; }
+@media (max-width: 560px) {
+  .export-formats { grid-template-columns: 1fr; }
+  .export-date { flex: 1; }
+  .export-date .input { width: 100%; min-width: 0; }
+  .export-note { display: none; }
+}
 .modal-review { width: min(100%, 560px); }
 .review-kicker { display: inline-flex; align-items: center; gap: 6px; color: var(--gold); font-size: 10px; font-weight: 700; letter-spacing: .08em; }
 .review-lead { margin-bottom: 16px; color: var(--muted); font-size: 11px; }

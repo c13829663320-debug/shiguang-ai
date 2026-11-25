@@ -21,6 +21,7 @@
     text: '<path d="M5 5h14M12 5v15M8 20h8"/>',
     file: '<path d="M6 3h8l4 4v14H6Z"/><path d="M14 3v5h4M9 13h6M9 17h6"/>',
     image: '<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="m3 17 5-4 4 3 3-3 6 5"/>',
+    printer: '<path d="M7 8V3h10v5"/><path d="M7 17H5a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2"/><rect x="7" y="14" width="10" height="7" rx="1"/>',
     mic: '<rect x="9" y="3" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3M8 21h8"/>',
     video: '<rect x="3" y="6" width="13" height="12" rx="2"/><path d="m16 10 5-3v10l-5-3Z"/>',
     smile: '<circle cx="12" cy="12" r="9"/><path d="M8 14s1.5 3 4 3 4-3 4-3M9 9h.01M15 9h.01"/>',
@@ -553,7 +554,7 @@
     </div>` : '';
     const relatedHTML = related.length ? `<div class="related-block"><div class="related-title">${getIcon('link', 14)} 相关记忆</div><div class="related-list">${related.map(item => `<button class="related-item" data-related="${item.id}"><span class="related-item-title">${esc(item.title)}</span><span class="related-item-meta">${formatDate(item.occurredAt, false)} · ${item.sharedTags.length ? `共同标签：${item.sharedTags.map(esc).join('、')}` : '内容相近'}</span></button>`).join('')}</div></div>` : '';
     const overlay = document.createElement('div'); overlay.className = 'modal-overlay';
-    overlay.innerHTML = `<div class="modal modal-lg" role="dialog" aria-modal="true"><div class="modal-header"><div><span class="memory-type">${getIcon(icon, 14)} ${type}</span><h3 class="modal-title" style="margin-top:7px">${esc(record.title)}</h3></div><div class="row">${navHTML}<button class="btn btn-ghost btn-icon" data-close>${getIcon('x')}</button></div></div><div class="modal-body"><div class="detail-meta"><span>${getIcon('calendar', 13)} ${formatDate(record.occurredAt)} ${formatTime(record.occurredAt)}</span><span>${getIcon('smile', 13)} ${esc(record.mood)}</span><span>${esc(record.source)}</span></div><div class="memory-tags" style="margin-bottom:18px">${record.tags.map(tag => `<span class="tag tag-teal">${esc(tag)}</span>`).join('')}</div><div class="detail-content">${renderMarkdown(record.content || '这条记忆只有附件，没有文字描述。')}</div>${record.attachments.map(attachmentHTML).join('')}${relatedHTML}</div><div class="modal-footer detail-footer" style="justify-content:space-between"><div class="row"><button class="btn btn-ghost btn-sm" id="detail-pin">${getIcon('pin', 15)} ${record.pinned ? '取消置顶' : '置顶'}</button><button class="btn btn-ghost btn-sm" id="detail-delete">${getIcon('trash', 15)} 删除</button></div><div class="row"><button class="btn btn-secondary btn-sm" id="detail-share">${getIcon('image', 15)} 分享卡片</button><button class="btn btn-dark" id="detail-edit">${getIcon('edit', 15)} 编辑记忆</button></div></div></div>`;
+    overlay.innerHTML = `<div class="modal modal-lg" role="dialog" aria-modal="true"><div class="modal-header"><div><span class="memory-type">${getIcon(icon, 14)} ${type}</span><h3 class="modal-title" style="margin-top:7px">${esc(record.title)}</h3></div><div class="row">${navHTML}<button class="btn btn-ghost btn-icon" data-close>${getIcon('x')}</button></div></div><div class="modal-body"><div class="detail-meta"><span>${getIcon('calendar', 13)} ${formatDate(record.occurredAt)} ${formatTime(record.occurredAt)}</span><span>${getIcon('smile', 13)} ${esc(record.mood)}</span><span>${esc(record.source)}</span></div><div class="memory-tags" style="margin-bottom:18px">${record.tags.map(tag => `<span class="tag tag-teal">${esc(tag)}</span>`).join('')}</div><div class="detail-content">${renderMarkdown(record.content || '这条记忆只有附件，没有文字描述。')}</div>${record.attachments.map(attachmentHTML).join('')}${relatedHTML}</div><div class="modal-footer detail-footer" style="justify-content:space-between"><div class="row"><button class="btn btn-ghost btn-sm" id="detail-pin">${getIcon('pin', 15)} ${record.pinned ? '取消置顶' : '置顶'}</button><button class="btn btn-ghost btn-sm" id="detail-export">${getIcon('image', 15)} 长图</button><button class="btn btn-ghost btn-sm" id="detail-delete">${getIcon('trash', 15)} 删除</button></div><div class="row"><button class="btn btn-secondary btn-sm" id="detail-share">${getIcon('image', 15)} 分享卡片</button><button class="btn btn-dark" id="detail-edit">${getIcon('edit', 15)} 编辑记忆</button></div></div></div>`;
     document.body.appendChild(overlay);
     const imageAttachments = record.attachments.filter(file => file.type === 'image' && (file.dataUrl || file.url));
     if (imageAttachments.length) {
@@ -581,6 +582,7 @@
     overlay.querySelector('#detail-next')?.addEventListener('click', () => goTo(later));
     overlay.querySelectorAll('[data-related]').forEach(btn => btn.onclick = () => { document.removeEventListener('keydown', onNavKey, true); const nextId = btn.dataset.related; overlay.remove(); openRecordDetail(nextId); });
     overlay.querySelector('#detail-share').onclick = () => openShareCard(id);
+    overlay.querySelector('#detail-export').onclick = () => { document.removeEventListener('keydown', onNavKey, true); overlay.remove(); openMemoryLongImage(id); };
     overlay.querySelector('#detail-edit').onclick = () => { document.removeEventListener('keydown', onNavKey, true); overlay.remove(); openRecordEditor(id); };
     overlay.querySelector('#detail-pin').onclick = () => { document.removeEventListener('keydown', onNavKey, true); MemoryStore.togglePin(id); overlay.remove(); showToast('置顶状态已更新', 'success'); };
     overlay.querySelector('#detail-delete').onclick = () => { document.removeEventListener('keydown', onNavKey, true); overlay.remove(); showConfirm({ title: '删除这条记忆？', message: `「${record.title}」及其附件将被永久删除，建议先导出备份。`, confirmText: '永久删除', onConfirm: () => { MemoryStore.deleteRecord(id); showToast('记忆已删除', 'success'); } }); };
@@ -684,6 +686,354 @@
     avatarImg.onload = () => draw(avatarImg);
     avatarImg.onerror = () => draw(null);
     avatarImg.src = avatarSrc;
+  };
+
+  /* 记忆导出：长图、打印 / PDF 与批量导出中心 */
+  const LONG_WIDTH = 1080;
+  const LONG_LEFT = 96;
+  const LONG_CONTENT = LONG_WIDTH - LONG_LEFT * 2;
+  const LONG_SERIF = '"Noto Serif SC", "Songti SC", SimSun, serif';
+  const LONG_SANS = 'Inter, "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif';
+  const MAX_LONG_IMAGE_RECORDS = 12;
+
+  function longTextLines(ctx, text, maxWidth, maxLines) {
+    const source = String(text ?? '').replace(/\r/g, '');
+    const lines = [];
+    source.split('\n').forEach(paragraph => {
+      if (lines.length >= maxLines) return;
+      const chars = Array.from(paragraph.trim());
+      if (!chars.length) return;
+      let line = '';
+      chars.forEach(char => {
+        if (ctx.measureText(line + char).width > maxWidth && line) { lines.push(line); line = char; }
+        else line += char;
+      });
+      if (line) lines.push(line);
+    });
+    const flat = source.replace(/\s/g, '');
+    if (!lines.length) return ['（无正文）'];
+    if (lines.length > maxLines) lines.length = maxLines;
+    if (flat.length > lines.join('').length) {
+      const last = lines[lines.length - 1];
+      lines[lines.length - 1] = `${last.slice(0, Math.max(1, last.length - 1))}…`;
+    }
+    return lines;
+  }
+
+  function openLongImagePreview({ url, blob, filename, count, label }) {
+    const overlay = document.createElement('div'); overlay.className = 'modal-overlay';
+    overlay.innerHTML = `<div class="modal modal-share" role="dialog" aria-modal="true"><div class="modal-header"><div><div class="eyebrow">LONG IMAGE</div><h3 class="modal-title">记忆长图预览</h3></div><button class="btn btn-ghost btn-icon" data-close>${getIcon('x')}</button></div><div class="modal-body"><div class="share-preview"><img src="${url}" alt="记忆长图预览"></div><p class="share-hint">${esc(label)} · 共 ${count} 条 · 1080px 宽长图，可直接保存或分享。</p></div><div class="modal-footer"><button class="btn btn-secondary" data-close>关闭</button><button class="btn btn-primary" id="long-download">${getIcon('download', 16)} 下载长图</button></div></div>`;
+    document.body.appendChild(overlay);
+    const close = () => { window.removeEventListener('keydown', onKey); overlay.remove(); URL.revokeObjectURL(url); };
+    const onKey = event => { if (event.key === 'Escape') close(); };
+    window.addEventListener('keydown', onKey);
+    overlay.querySelectorAll('[data-close]').forEach(btn => btn.onclick = close);
+    overlay.addEventListener('click', event => { if (event.target === overlay) close(); });
+    overlay.querySelector('#long-download').onclick = () => {
+      SG.download(filename, blob);
+      showToast('长图已开始下载', 'success');
+    };
+  }
+
+  function exportLongImage(records, label) {
+    if (!records.length) { showToast('当前范围没有可导出的记忆。', 'error'); return; }
+    const single = records.length === 1;
+    const bodyLimit = single ? 160 : 14;
+    const measure = document.createElement('canvas').getContext('2d');
+    const blocks = records.map(record => {
+      const [typeName] = typeMap[record.type] || typeMap.text;
+      const date = new Date(record.occurredAt);
+      measure.font = `700 46px ${LONG_SERIF}`;
+      const titleLines = longTextLines(measure, record.title, LONG_CONTENT, 3);
+      measure.font = `400 27px ${LONG_SERIF}`;
+      const bodyLines = longTextLines(measure, record.content || '这条记忆只有附件，没有文字描述。', LONG_CONTENT, bodyLimit);
+      const imageCount = record.attachments.filter(file => file.type === 'image').length;
+      const height = 40 + titleLines.length * 62 + 24 + bodyLines.length * 50 + (record.tags.length ? 54 : 0) + (record.attachments.length ? 34 : 0) + 58;
+      return { record, typeName, date, titleLines, bodyLines, imageCount, height };
+    });
+    const headerHeight = 292;
+    const footerHeight = 168;
+    const totalHeight = Math.min(32000, headerHeight + blocks.reduce((sum, block) => sum + block.height, 0) + footerHeight);
+    const canvas = document.createElement('canvas');
+    canvas.width = LONG_WIDTH; canvas.height = totalHeight;
+    const ctx = canvas.getContext('2d');
+
+    ctx.fillStyle = '#f6f3ed'; ctx.fillRect(0, 0, LONG_WIDTH, totalHeight);
+    ctx.strokeStyle = '#dedbd2'; ctx.lineWidth = 2; ctx.strokeRect(56, 56, LONG_WIDTH - 112, totalHeight - 112);
+    ctx.strokeStyle = 'rgba(231,111,81,.12)'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(LONG_WIDTH - 84, 132, 96, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.arc(LONG_WIDTH - 84, 132, 140, 0, Math.PI * 2); ctx.stroke();
+
+    ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+    ctx.fillStyle = '#e76f51'; ctx.beginPath(); ctx.arc(LONG_LEFT + 9, 128, 9, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#1e2623'; ctx.font = `700 30px ${LONG_SERIF}`; ctx.fillText('拾光AI', LONG_LEFT + 32, 140);
+    ctx.fillStyle = '#89908a'; ctx.font = `600 15px ${LONG_SANS}`; ctx.textAlign = 'right'; ctx.fillText('MEMORY ARCHIVE', LONG_WIDTH - LONG_LEFT, 138); ctx.textAlign = 'left';
+    ctx.fillStyle = '#dedbd2'; ctx.fillRect(LONG_LEFT, 178, LONG_CONTENT, 1);
+    ctx.fillStyle = '#2a6f6a'; ctx.font = `600 24px ${LONG_SANS}`; ctx.fillText(label, LONG_LEFT, 234);
+    ctx.fillStyle = '#89908a'; ctx.font = `500 18px ${LONG_SANS}`; ctx.fillText(`共 ${records.length} 条 · ${new Date().toLocaleDateString('zh-CN')} 导出`, LONG_LEFT, 266);
+
+    let y = headerHeight;
+    blocks.forEach(block => {
+      const { record, typeName, date } = block;
+      ctx.fillStyle = '#2a6f6a'; ctx.font = `600 23px ${LONG_SANS}`;
+      ctx.fillText(`${typeName} · ${date.getFullYear()} 年 ${date.getMonth() + 1} 月 ${date.getDate()} 日 · ${record.mood}`, LONG_LEFT, y + 24);
+      y += 40;
+      ctx.fillStyle = '#1e2623'; ctx.font = `700 46px ${LONG_SERIF}`;
+      block.titleLines.forEach(line => { ctx.fillText(line, LONG_LEFT, y + 40); y += 62; });
+      y += 24;
+      ctx.fillStyle = '#53605a'; ctx.font = `400 27px ${LONG_SERIF}`;
+      block.bodyLines.forEach(line => { ctx.fillText(line, LONG_LEFT, y + 32); y += 50; });
+      if (record.tags.length) {
+        let tagX = LONG_LEFT;
+        ctx.font = `600 21px ${LONG_SANS}`;
+        record.tags.slice(0, 6).forEach(tag => {
+          const chipWidth = ctx.measureText(tag).width + 36;
+          if (tagX + chipWidth > LONG_WIDTH - LONG_LEFT) return;
+          ctx.fillStyle = '#dfece8'; canvasRoundRect(ctx, tagX, y + 6, chipWidth, 38, 19); ctx.fill();
+          ctx.fillStyle = '#2a6f6a'; ctx.fillText(tag, tagX + 18, y + 31);
+          tagX += chipWidth + 10;
+        });
+        y += 54;
+      }
+      if (record.attachments.length) {
+        const text = `附件 ${record.attachments.length} 项${block.imageCount ? ` · 含 ${block.imageCount} 张图片` : ''}`;
+        ctx.fillStyle = '#89908a'; ctx.font = `500 20px ${LONG_SANS}`;
+        ctx.fillText(text, LONG_LEFT, y + 20);
+        y += 34;
+      }
+      ctx.fillStyle = '#e4e0d6'; ctx.fillRect(LONG_LEFT, y + 20, LONG_CONTENT, 1);
+      y += 58;
+    });
+
+    const footY = totalHeight - 118;
+    ctx.fillStyle = '#dedbd2'; ctx.fillRect(LONG_LEFT, footY - 46, LONG_CONTENT, 1);
+    ctx.fillStyle = '#1e2623'; ctx.font = `700 26px ${LONG_SERIF}`; ctx.fillText('记录，是对时间最温柔的抵抗。', LONG_LEFT, footY);
+    ctx.fillStyle = '#89908a'; ctx.font = `500 19px ${LONG_SANS}`; ctx.fillText('拾光AI · 本地记忆档案', LONG_LEFT, footY + 40);
+
+    const stamp = new Date().toISOString().slice(0, 10);
+    const safeTitle = String(records[0].title || '').replace(/[\\/:*?"<>|]/g, '').trim().slice(0, 30) || '记忆';
+    const filename = single
+      ? `拾光AI-${safeTitle}-${new Date(records[0].occurredAt).toISOString().slice(0, 10)}.png`
+      : `拾光AI-记忆长图-${records.length}条-${stamp}.png`;
+    canvas.toBlob(blob => {
+      if (!blob) { showToast('长图生成失败，请减少导出条数后重试。', 'error'); return; }
+      openLongImagePreview({ url: URL.createObjectURL(blob), blob, filename, count: records.length, label });
+    }, 'image/png');
+  }
+
+  window.openMemoryLongImage = function (id) {
+    const record = MemoryStore.getRecord(id);
+    if (!record) { showToast('这条记忆不存在或已删除。', 'error'); return; }
+    exportLongImage([record], `单条记忆 · ${formatDate(record.occurredAt)}`);
+  };
+
+  function printMemoryReport(records, label) {
+    if (!records.length) { showToast('当前范围没有可导出的记忆。', 'error'); return; }
+    const items = records.map(record => {
+      const [typeName] = typeMap[record.type] || typeMap.text;
+      const paragraphs = String(record.content || '').trim()
+        .split(/\n+/).filter(Boolean)
+        .map(line => `<p>${esc(line)}</p>`).join('') || '<p>这条记忆只有附件，没有文字描述。</p>';
+      const tags = record.tags.length ? `<div class="tags">${record.tags.map(tag => `<span>${esc(tag)}</span>`).join('')}</div>` : '';
+      const files = record.attachments.length ? `<p class="files">附件：${record.attachments.map(file => esc(file.name)).join('、')}</p>` : '';
+      return `<article><div class="meta">${esc(typeName)} · ${esc(formatDate(record.occurredAt))} ${esc(formatTime(record.occurredAt))} · ${esc(record.mood)}</div><h2>${esc(record.title)}</h2><div class="body">${paragraphs}</div>${tags}${files}</article>`;
+    }).join('');
+    const doc = `<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><title>拾光AI · 记忆档案</title><style>
+      @page { size: A4; margin: 20mm 16mm; }
+      * { box-sizing: border-box; }
+      body { margin: 0; color: #1e2623; background: #fff; font-family: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif; font-size: 12pt; line-height: 1.75; }
+      header { border-bottom: 2px solid #1e2623; padding-bottom: 14px; margin-bottom: 26px; }
+      .brand { display: flex; align-items: center; gap: 8px; font-size: 15pt; font-weight: 700; letter-spacing: .04em; }
+      .dot { width: 10px; height: 10px; border-radius: 50%; background: #e76f51; }
+      .label { margin-top: 10px; color: #89908a; font-size: 8pt; letter-spacing: .22em; }
+      h1 { margin: 8px 0 6px; font-family: "Noto Serif SC", "Songti SC", SimSun, serif; font-size: 24pt; }
+      .sub { margin: 0; color: #53605a; font-size: 10pt; }
+      article { border-bottom: 1px solid #dedbd2; padding-bottom: 18px; margin-bottom: 22px; break-inside: avoid; page-break-inside: avoid; }
+      .meta { color: #2a6f6a; font-size: 9.5pt; font-weight: 600; }
+      h2 { margin: 8px 0 10px; font-family: "Noto Serif SC", "Songti SC", SimSun, serif; font-size: 16pt; line-height: 1.4; }
+      .body p { margin: 0 0 8px; white-space: pre-wrap; word-break: break-word; }
+      .tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+      .tags span { padding: 2px 10px; border: 1px solid #bcd7d0; border-radius: 99px; color: #2a6f6a; font-size: 8.5pt; }
+      .files { margin: 8px 0 0; color: #89908a; font-size: 9pt; }
+      footer { margin-top: 26px; padding-top: 12px; border-top: 1px solid #dedbd2; color: #89908a; font-size: 9pt; text-align: center; }
+    </style></head><body><header><div class="brand"><span class="dot"></span>拾光AI</div><div class="label">MEMORY ARCHIVE</div><h1>我的记忆档案</h1><p class="sub">${esc(label)} · 共 ${records.length} 条 · 导出于 ${esc(new Date().toLocaleString('zh-CN'))}</p></header>${items}<footer>拾光AI · 本地记忆档案 · 记录，是对时间最温柔的抵抗。</footer></body></html>`;
+    const iframe = document.createElement('iframe');
+    iframe.setAttribute('aria-hidden', 'true');
+    iframe.setAttribute('tabindex', '-1');
+    iframe.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;';
+    document.body.appendChild(iframe);
+    const frameWindow = iframe.contentWindow;
+    if (!frameWindow) {
+      iframe.remove();
+      showToast('当前浏览器无法创建打印视图，请换用桌面浏览器重试。', 'error');
+      return;
+    }
+    const frameDoc = frameWindow.document;
+    frameDoc.open();
+    frameDoc.write(doc);
+    frameDoc.close();
+    window.setTimeout(() => {
+      try {
+        frameWindow.focus();
+        frameWindow.print();
+      } catch (error) {
+        showToast('打印启动失败，请检查浏览器的打印权限。', 'error');
+      }
+      window.setTimeout(() => iframe.remove(), 60000);
+    }, 320);
+  }
+
+  window.openExportCenter = function () {
+    const tags = MemoryStore.tags();
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const toDateValue = value => {
+      const date = new Date(Number(value));
+      return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    };
+    const parseDate = (value, endOfDay) => {
+      if (!value) return undefined;
+      const date = new Date(`${value}T00:00:00`);
+      if (Number.isNaN(date.getTime())) return undefined;
+      if (endOfDay) date.setHours(23, 59, 59, 999);
+      return date.getTime();
+    };
+    const stamp = () => new Date().toISOString().slice(0, 10);
+    const state = {
+      scope: 'all',
+      tag: tags[0]?.name || '',
+      from: toDateValue(today.getTime() - 29 * 86400000),
+      to: toDateValue(today.getTime()),
+      format: 'image'
+    };
+    const formats = [
+      { key: 'image', icon: 'image', title: '长图 PNG', desc: '1080px 宽长图，适合保存与分享' },
+      { key: 'pdf', icon: 'printer', title: '打印 / PDF', desc: 'A4 排版，可打印或另存为 PDF' },
+      { key: 'markdown', icon: 'file', title: 'Markdown', desc: '纯文本归档，保留标题、正文与标签' },
+      { key: 'json', icon: 'download', title: 'JSON 备份', desc: '完整数据备份，不受范围限制，不含密钥' }
+    ];
+    const overlay = document.createElement('div'); overlay.className = 'modal-overlay';
+    overlay.innerHTML = `<div class="modal modal-lg export-modal" role="dialog" aria-modal="true"><div class="modal-header"><div><div class="eyebrow">EXPORT MEMORIES</div><h3 class="modal-title">导出记忆</h3></div><button class="btn btn-ghost btn-icon" data-close>${getIcon('x')}</button></div><div class="modal-body">
+      <section class="export-section">
+        <div class="export-label">导出范围</div>
+        <div class="filter-pills" id="export-scopes">
+          <button class="pill" data-scope="all">全部记忆</button>
+          <button class="pill" data-scope="tag" ${tags.length ? '' : 'disabled'}>按标签</button>
+          <button class="pill" data-scope="range">按日期</button>
+        </div>
+        <div class="export-sub" id="export-tag" hidden>${tags.length ? `<div class="filter-pills">${tags.slice(0, 12).map((tag, index) => `<button class="pill ${index === 0 ? 'active' : ''}" data-tag="${esc(tag.name)}">${esc(tag.name)} · ${tag.count}</button>`).join('')}</div>` : '<p class="muted small">还没有任何标签，先给记忆添加标签再来。</p>'}</div>
+        <div class="export-sub" id="export-range" hidden>
+          <div class="row wrap export-dates">
+            <label class="export-date"><span>开始日期</span><input class="input" type="date" id="export-from" value="${state.from}" max="${state.to}"></label>
+            <label class="export-date"><span>结束日期</span><input class="input" type="date" id="export-to" value="${state.to}"></label>
+          </div>
+          <div class="row wrap export-quick"><button class="btn btn-ghost btn-sm" data-range="7">近 7 天</button><button class="btn btn-ghost btn-sm" data-range="30">近 30 天</button><button class="btn btn-ghost btn-sm" data-range="year">今年</button></div>
+        </div>
+      </section>
+      <section class="export-section">
+        <div class="export-label">导出格式</div>
+        <div class="export-formats" id="export-formats">${formats.map(item => `<button class="export-format ${item.key === state.format ? 'active' : ''}" data-format="${item.key}">${getIcon(item.icon, 18)}<div class="export-format-text"><strong>${item.title}</strong><span>${item.desc}</span></div></button>`).join('')}</div>
+      </section>
+      <div class="export-summary" id="export-summary"></div>
+    </div><div class="modal-footer"><span class="export-note">数据只在本地生成，不会上传。</span><button class="btn btn-secondary" data-close>取消</button><button class="btn btn-primary" id="export-run">${getIcon('download', 16)} 生成导出</button></div></div>`;
+    document.body.appendChild(overlay);
+
+    const scopes = overlay.querySelector('#export-scopes');
+    const tagWrap = overlay.querySelector('#export-tag');
+    const rangeWrap = overlay.querySelector('#export-range');
+    const fromInput = overlay.querySelector('#export-from');
+    const toInput = overlay.querySelector('#export-to');
+    const summary = overlay.querySelector('#export-summary');
+    const runBtn = overlay.querySelector('#export-run');
+
+    const close = () => overlay.remove();
+    const scopeLabel = () => {
+      if (state.scope === 'tag') return state.tag ? `标签「${state.tag}」` : '按标签';
+      if (state.scope === 'range') return `${state.from} 至 ${state.to}`;
+      return '全部记忆';
+    };
+    const currentRecords = () => {
+      if (state.scope === 'tag' && state.tag) return MemoryStore.listRecords({ tag: state.tag }).sort((a, b) => a.occurredAt - b.occurredAt);
+      if (state.scope === 'range') {
+        const from = parseDate(state.from);
+        const to = parseDate(state.to, true);
+        if (from !== undefined && to !== undefined && from > to) return [];
+        return MemoryStore.listRecords({ from, to }).sort((a, b) => a.occurredAt - b.occurredAt);
+      }
+      return MemoryStore.listRecords().sort((a, b) => a.occurredAt - b.occurredAt);
+    };
+
+    function paint() {
+      scopes.querySelectorAll('[data-scope]').forEach(btn => btn.classList.toggle('active', btn.dataset.scope === state.scope));
+      tagWrap.hidden = state.scope !== 'tag';
+      rangeWrap.hidden = state.scope !== 'range';
+      overlay.querySelectorAll('[data-tag]').forEach(btn => btn.classList.toggle('active', btn.dataset.tag === state.tag));
+      overlay.querySelectorAll('[data-format]').forEach(btn => btn.classList.toggle('active', btn.dataset.format === state.format));
+      const count = currentRecords().length;
+      if (state.format === 'json') {
+        summary.textContent = `将导出完整备份，共 ${MemoryStore.listRecords().length} 条记忆，不受上方范围限制；文件不含 API 密钥。`;
+        summary.classList.remove('warn');
+        return;
+      }
+      if (!count) {
+        summary.textContent = '当前范围还没有记忆，换个范围再试试。';
+        summary.classList.remove('warn');
+        return;
+      }
+      const tooMany = state.format === 'image' && count > MAX_LONG_IMAGE_RECORDS;
+      summary.textContent = `${scopeLabel()} · 共 ${count} 条记忆${tooMany ? ` · 长图一次最多 ${MAX_LONG_IMAGE_RECORDS} 条，请缩小范围或改用 PDF` : ''}。`;
+      summary.classList.toggle('warn', tooMany);
+    }
+
+    overlay.querySelectorAll('[data-close]').forEach(btn => btn.onclick = close);
+    overlay.addEventListener('click', event => { if (event.target === overlay) close(); });
+    scopes.addEventListener('click', event => {
+      const btn = event.target.closest('[data-scope]'); if (!btn || btn.disabled) return;
+      state.scope = btn.dataset.scope; paint();
+    });
+    tagWrap.addEventListener('click', event => {
+      const btn = event.target.closest('[data-tag]'); if (!btn) return;
+      state.tag = btn.dataset.tag; paint();
+    });
+    fromInput.addEventListener('change', () => { state.from = fromInput.value; paint(); });
+    toInput.addEventListener('change', () => { state.to = toInput.value; paint(); });
+    overlay.querySelectorAll('[data-range]').forEach(btn => btn.onclick = () => {
+      const key = btn.dataset.range;
+      const now = new Date(); now.setHours(0, 0, 0, 0);
+      if (key === 'year') {
+        state.from = toDateValue(new Date(now.getFullYear(), 0, 1).getTime());
+        state.to = toDateValue(now.getTime());
+      } else {
+        state.from = toDateValue(now.getTime() - (Number(key) - 1) * 86400000);
+        state.to = toDateValue(now.getTime());
+      }
+      fromInput.value = state.from; toInput.value = state.to;
+      paint();
+    });
+    overlay.querySelector('#export-formats').addEventListener('click', event => {
+      const btn = event.target.closest('[data-format]'); if (!btn) return;
+      state.format = btn.dataset.format; paint();
+    });
+    runBtn.onclick = () => {
+      if (state.format === 'json') {
+        close();
+        SG.download(`拾光AI-备份-${stamp()}.json`, MemoryStore.exportJSON());
+        showToast('已导出 JSON 备份（不含密钥）', 'success');
+        return;
+      }
+      const records = currentRecords();
+      if (!records.length) { showToast('当前范围没有可导出的记忆。', 'error'); return; }
+      if (state.format === 'image' && records.length > MAX_LONG_IMAGE_RECORDS) { showToast(`长图一次最多 ${MAX_LONG_IMAGE_RECORDS} 条，请缩小范围或改用 PDF。`, 'error'); return; }
+      if (state.format === 'markdown') {
+        close();
+        SG.download(`拾光AI-记忆-${stamp()}.md`, MemoryStore.exportMarkdown(records));
+        showToast(`已导出 ${records.length} 条记忆的 Markdown`, 'success');
+        return;
+      }
+      if (state.format === 'pdf') { close(); printMemoryReport(records, scopeLabel()); return; }
+      close();
+      exportLongImage(records, scopeLabel());
+    };
+    paint();
   };
 
   window.openDailyReview = function () {
