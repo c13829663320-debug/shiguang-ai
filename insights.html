@@ -269,10 +269,10 @@
             <div class="page-content narrow">
               ${hasRecords ? `
                 <div class="grid-4">
-                  <div class="card stat-card"><span class="stat-icon">${getIcon('book', 20)}</span><div class="stat-label">记忆总数</div><div class="stat-value">${data.total}</div><div class="stat-note">条被保存的时光</div></div>
-                  <div class="card stat-card"><span class="stat-icon">${getIcon('calendar', 20)}</span><div class="stat-label">记录天数</div><div class="stat-value">${data.activeDays}</div><div class="stat-note">天里留下过记录</div></div>
-                  <div class="card stat-card"><span class="stat-icon">${getIcon('tag', 20)}</span><div class="stat-label">涉及主题</div><div class="stat-value">${data.tags.length}</div><div class="stat-note">个被使用过的标签</div></div>
-                  <div class="card stat-card"><span class="stat-icon">${getIcon('refresh', 20)}</span><div class="stat-label">平均每周</div><div class="stat-value">${data.averagePerWeek}</div><div class="stat-note">条持续发生的记录</div></div>
+                  <div class="card stat-card"><span class="stat-icon">${getIcon('book', 20)}</span><div class="stat-body"><div class="stat-label">记忆总数</div><div class="stat-value">${data.total}</div><div class="stat-note">条被保存的时光</div></div></div>
+                  <div class="card stat-card"><span class="stat-icon">${getIcon('calendar', 20)}</span><div class="stat-body"><div class="stat-label">记录天数</div><div class="stat-value">${data.activeDays}</div><div class="stat-note">天里留下过记录</div></div></div>
+                  <div class="card stat-card"><span class="stat-icon">${getIcon('tag', 20)}</span><div class="stat-body"><div class="stat-label">涉及主题</div><div class="stat-value">${data.tags.length}</div><div class="stat-note">个被使用过的标签</div></div></div>
+                  <div class="card stat-card"><span class="stat-icon">${getIcon('refresh', 20)}</span><div class="stat-body"><div class="stat-label">平均每周</div><div class="stat-value">${data.averagePerWeek}</div><div class="stat-note">条持续发生的记录</div></div></div>
                 </div>
 
                 <div class="insight-strip">${getIcon('sparkles', 16)}<span>你最常记录的主题是 <strong>「${SG.esc(data.topTag?.name || '日常')}」</strong>（${data.topTag?.count || 0} 次），高频心情是 <strong>「${SG.esc(data.topMood?.name || '平静')}」</strong>，记录最集中的时段是 <strong>「${data.peakPeriod.label}」</strong>。</span></div>
