@@ -45,7 +45,7 @@
       tags: row[4], mood: row[5], source: row[6], pinned: index === 0 || index === 7,
       attachments: [], isSample: true
     }));
-    return { version: 2, records, reviews: [], chats: [], trash: [], settings: clone(defaultSettings), createdAt: Date.now() };
+    return { version: 2, records, capsules: [], reviews: [], chats: [], trash: [], settings: clone(defaultSettings), createdAt: Date.now() };
   }
 
   function load() {
@@ -57,6 +57,7 @@
       return {
         ...seedData(), ...parsed,
         records: parsed.records,
+        capsules: Array.isArray(parsed.capsules) ? parsed.capsules.filter(item => item && item.id && Number(item.unlockAt)) : [],
         reviews: Array.isArray(parsed.reviews) ? parsed.reviews : [],
         chats: Array.isArray(parsed.chats) ? parsed.chats : [],
         trash: Array.isArray(parsed.trash) ? parsed.trash.filter(item => item && item.id && (!item.deletedAt || Date.now() - Number(item.deletedAt) < TRASH_DAYS * DAY)) : [],
@@ -78,6 +79,7 @@
       throw new Error('浏览器本地存储空间不足。请删除较大的附件，或先导出备份后清理数据。');
     }
   }
+  unlockDueCapsules();
   function normalizeRecord(input, existing) {
     const now = Date.now();
     const content = String(input.content || '').trim();
@@ -97,6 +99,21 @@
       attachments: Array.isArray(input.attachments) ? input.attachments : (existing?.attachments || []),
       isSample: Boolean(existing?.isSample && input.isSample !== false)
     };
+  }
+  // 时间胶囊：到期后自动迁移为普通记忆，避免所有基于 records 的功能重复判断。
+  function unlockDueCapsules() {
+    const now = Date.now();
+    if (!Array.isArray(db.capsules) || !db.capsules.length) return 0;
+    const due = db.capsules.filter(item => Number(item.unlockAt) <= now);
+    if (!due.length) return 0;
+    db.capsules = db.capsules.filter(item => Number(item.unlockAt) > now);
+    due.forEach(capsule => {
+      const record = normalizeRecord({ ...capsule, isSample: false }, null);
+      record.createdAt = Number(capsule.createdAt) || now;
+      db.records.push(record);
+    });
+    persist();
+    return due.length;
   }
   function startOfWeek(offset = 0) {
     const date = new Date();
@@ -143,6 +160,7 @@
     all() { return clone(db); },
     settings() { return clone(db.settings); },
     listRecords(filters = {}) {
+      unlockDueCapsules();
       const query = String(filters.query || '').trim().toLowerCase();
       return db.records.filter(record => {
         const haystack = `${record.title}\n${record.content}\n${record.tags.join(' ')}`.toLowerCase();
@@ -156,6 +174,35 @@
       }).sort((a, b) => Number(b.pinned) - Number(a.pinned) || b.occurredAt - a.occurredAt);
     },
     getRecord(id) { const found = db.records.find(item => item.id === id); return found ? clone(found) : null; },
+    isLocked(record) { return Number(record && record.unlockAt) > Date.now(); },
+    capsules() { unlockDueCapsules(); return clone(db.capsules).sort((a, b) => a.unlockAt - b.unlockAt); },
+    getCapsule(id) { const found = db.capsules.find(item => item.id === id); return found ? clone(found) : null; },
+    createCapsule(input, unlockAt) {
+      const now = Date.now();
+      const timestamp = Number(unlockAt);
+      if (!timestamp || timestamp <= now) throw new Error('开启日期需要晚于当前时间。');
+      const base = normalizeRecord({ ...input, isSample: false }, null);
+      const capsule = { ...base, id: uid('capsule'), unlockAt: timestamp, sealedAt: now };
+      db.capsules.push(capsule);
+      persist(); return clone(capsule);
+    },
+    openCapsule(id) {
+      const index = db.capsules.findIndex(item => item.id === id);
+      if (index < 0) return null;
+      const [capsule] = db.capsules.splice(index, 1);
+      const record = normalizeRecord({ ...capsule, isSample: false }, null);
+      record.id = uid('memory');
+      record.createdAt = Number(capsule.createdAt) || Date.now();
+      record.updatedAt = Date.now();
+      db.records.unshift(record);
+      persist(); return clone(record);
+    },
+    deleteCapsule(id) {
+      const before = db.capsules.length;
+      db.capsules = db.capsules.filter(item => item.id !== id);
+      if (db.capsules.length !== before) persist();
+      return before !== db.capsules.length;
+    },
     createRecord(input) {
       const record = normalizeRecord({ ...input, isSample: false });
       db.records.unshift(record); persist(); return clone(record);
@@ -504,18 +551,30 @@
       if (!incoming || !Array.isArray(incoming.records)) throw new Error('这不是有效的拾光AI备份文件：缺少 records 数组。');
       const now = Date.now();
       const imported = incoming.records.map(item => normalizeRecord({ ...item, isSample: false }, null));
-      if (mode === 'replace') { db.records = []; db.trash = []; }
-      const ids = new Set([...db.records, ...db.trash].map(item => item.id));
+      if (mode === 'replace') { db.records = []; db.trash = []; db.capsules = []; }
+      const ids = new Set([...db.records, ...db.trash, ...db.capsules].map(item => item.id));
       imported.forEach(item => {
         if (ids.has(item.id)) item.id = uid('memory');
         item.createdAt = Number(item.createdAt) || now;
         db.records.push(item); ids.add(item.id);
       });
+      if (Array.isArray(incoming.capsules)) {
+        incoming.capsules.filter(item => item && Number(item.unlockAt)).forEach(item => {
+          const record = normalizeRecord({ ...item, isSample: false }, null);
+          if (Number(item.unlockAt) > now) {
+            const capsule = { ...record, id: ids.has(item.id) ? uid('capsule') : (item.id || uid('capsule')), unlockAt: Number(item.unlockAt), sealedAt: Number(item.sealedAt) || now };
+            db.capsules.push(capsule); ids.add(capsule.id);
+          } else {
+            if (ids.has(record.id)) record.id = uid('memory');
+            db.records.push(record); ids.add(record.id);
+          }
+        });
+      }
       if (Array.isArray(incoming.reviews)) db.reviews = mode === 'replace' ? incoming.reviews : [...db.reviews, ...incoming.reviews];
       persist();
       return imported.length;
     },
-    clearAll() { db = { version: 2, records: [], reviews: [], chats: [], trash: [], settings: clone(db.settings), createdAt: Date.now() }; persist(); },
+    clearAll() { db = { version: 2, records: [], capsules: [], reviews: [], chats: [], trash: [], settings: clone(db.settings), createdAt: Date.now() }; persist(); },
     resetDemo() { const settings = clone(db.settings); db = seedData(); db.settings = settings; persist(); }
   };
 

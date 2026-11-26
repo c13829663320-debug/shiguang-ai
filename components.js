@@ -41,7 +41,8 @@
     refresh: '<path d="M20 7v5h-5M4 17v-5h5"/><path d="M6 8a7 7 0 0 1 12-2l2 6M4 12l2 6a7 7 0 0 0 12-2"/>',
     shield: '<path d="M12 3 4 6v6c0 5 3 8 8 10 5-2 8-5 8-10V6Z"/><path d="m8 12 3 3 5-6"/>',
     compass: '<circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2 5-5 2 2-5Z"/>',
-    more: '<circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/>'
+    more: '<circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/>',
+    lock: '<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>'
   };
   const esc = (value) => String(value ?? '').replace(/[&<>'"]/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[char]));
   const typeMap = {
@@ -596,6 +597,36 @@
       showToast(`「${record.title}」已移到回收站`, 'success', 5200, {
         label: '撤销',
         onClick: () => { MemoryStore.restoreRecord(id); showToast('已恢复这条记忆', 'success'); }
+      });
+    };
+  };
+
+  // 时间胶囊详情：封存期间只展示标题与日期，内容完全不渲染，避免从 DOM 泄露。
+  window.openCapsule = function (id) {
+    const capsule = MemoryStore.getCapsule(id);
+    if (!capsule) { showToast('这枚时间胶囊不存在或已经开启。', 'error'); return; }
+    const days = Math.max(1, Math.ceil((Number(capsule.unlockAt) - Date.now()) / 86400000));
+    const overlay = document.createElement('div'); overlay.className = 'modal-overlay';
+    overlay.innerHTML = `<div class="modal modal-sm capsule-seal" role="dialog" aria-modal="true"><div class="modal-header"><div><div class="eyebrow">TIME CAPSULE</div><h3 class="modal-title">一枚沉睡的时间胶囊</h3></div><button class="btn btn-ghost btn-icon" data-close aria-label="关闭">${getIcon('x')}</button></div><div class="modal-body"><div class="seal-lock">${getIcon('lock', 26)}</div><h4 class="seal-title">${esc(capsule.title)}</h4><p class="seal-days"><strong>${days}</strong> 天后开启</p><div class="seal-meta"><span>${getIcon('calendar', 13)} 写于 ${formatDate(capsule.sealedAt || capsule.createdAt)}</span><span>${getIcon('clock', 13)} 开启 ${formatDate(capsule.unlockAt)}</span></div><p class="seal-hint">封存期间，这段内容不会出现在搜索、洞察、年度回顾与导出中。到期后会自动变成一条普通记忆。</p></div><div class="modal-footer seal-footer"><button class="btn btn-ghost btn-sm" id="capsule-delete">${getIcon('trash', 15)} 永久删除</button><div class="row"><button class="btn btn-secondary btn-sm" id="capsule-open">提前开启</button><button class="btn btn-dark" data-close>先让它睡着</button></div></div></div>`;
+    document.body.appendChild(overlay);
+    const onEsc = event => { if (event.key === 'Escape') { event.stopPropagation(); close(); } };
+    const close = () => { document.removeEventListener('keydown', onEsc, true); overlay.remove(); };
+    document.addEventListener('keydown', onEsc, true);
+    overlay.querySelectorAll('[data-close]').forEach(btn => btn.onclick = close);
+    overlay.querySelector('#capsule-open').onclick = () => {
+      showConfirm({
+        title: '现在打开这枚胶囊？', message: '打开后会立即变成普通记忆，和其他记录一样出现在搜索与时光轴中。', confirmText: '现在开启', danger: false,
+        onConfirm: () => {
+          const record = MemoryStore.openCapsule(id);
+          close();
+          if (record) { showToast('胶囊已开启，欢迎回来', 'success'); openRecordDetail(record.id); }
+        }
+      });
+    };
+    overlay.querySelector('#capsule-delete').onclick = () => {
+      showConfirm({
+        title: '永久删除这枚胶囊？', message: '封存的内容会被直接删除，不会进入回收站，也无法恢复。', confirmText: '永久删除',
+        onConfirm: () => { MemoryStore.deleteCapsule(id); close(); showToast('这枚胶囊已删除', 'success'); }
       });
     };
   };
@@ -1325,9 +1356,18 @@
     let attachments = [...record.attachments];
     const toLocalInput = stamp => new Date(Number(stamp) - new Date(Number(stamp)).getTimezoneOffset() * 60000).toISOString().slice(0, 16);
     const dateValue = toLocalInput(record.occurredAt);
+    const unlockDate = new Date(); unlockDate.setDate(unlockDate.getDate() + 30);
+    const unlockDefault = `${unlockDate.getFullYear()}-${String(unlockDate.getMonth() + 1).padStart(2, '0')}-${String(unlockDate.getDate()).padStart(2, '0')}`;
+    const capsuleHTML = existing ? '' : `<div class="field capsule-field"><label class="capsule-toggle"><input type="checkbox" id="record-capsule">${getIcon('lock', 15)}<span>封存为时间胶囊</span></label><div class="capsule-date" id="capsule-date" hidden><input class="input" id="record-unlock" type="date" value="${unlockDefault}"><span class="field-hint">到开启日期前，这条记忆不会出现在搜索、洞察与导出中；到期会自动转为普通记忆。</span></div></div>`;
     const overlay = document.createElement('div'); overlay.className = 'modal-overlay';
-    overlay.innerHTML = `<div class="modal modal-lg" role="dialog" aria-modal="true"><form id="record-form"><div class="modal-header"><div><div class="eyebrow">${existing ? 'EDIT MEMORY' : 'CAPTURE THE MOMENT'}</div><h3 class="modal-title">${existing ? '编辑记忆' : '此刻，值得留下'}</h3></div><button class="btn btn-ghost btn-icon" type="button" data-close>${getIcon('x')}</button></div><div class="modal-body"><div class="form-stack"><div class="draft-notice" id="draft-notice" hidden><span></span><button type="button" class="btn btn-ghost btn-sm" id="discard-draft">丢弃草稿</button></div><div class="field"><label class="field-label" for="record-title">标题</label><input class="input" id="record-title" maxlength="80" value="${esc(record.title)}" placeholder="给这段记忆一个名字，留空将自动截取正文"></div><div class="field"><label class="field-label" for="record-content">正文</label><textarea class="textarea" id="record-content" style="min-height:160px" placeholder="发生了什么？当时的你在想什么？">${esc(record.content)}</textarea></div><div class="form-grid"><div class="field"><label class="field-label" for="record-type">记忆类型</label><select class="select" id="record-type">${Object.entries(typeMap).map(([key, value]) => `<option value="${key}" ${record.type === key ? 'selected' : ''}>${value[0]}</option>`).join('')}</select></div><div class="field"><label class="field-label" for="record-date">发生时间</label><input class="input" id="record-date" type="datetime-local" value="${dateValue}" required></div><div class="field"><label class="field-label" for="record-mood">此刻心情</label><select class="select" id="record-mood">${['平静', '愉快', '有收获', '专注', '充实', '轻松', '期待', '温暖', '兴奋', '反思', '疲惫', '低落'].map(mood => `<option ${record.mood === mood ? 'selected' : ''}>${mood}</option>`).join('')}</select></div><div class="field"><label class="field-label" for="record-tags">标签</label><input class="input" id="record-tags" value="${esc(record.tags.join('，'))}" placeholder="学习，阅读（用逗号分隔）"><div class="tag-suggest" id="tag-suggest" aria-live="polite" hidden></div></div></div><div class="field"><span class="field-label">附件</span><div class="row wrap"><button class="btn btn-secondary btn-sm" type="button" id="add-attachment">${getIcon('upload', 14)} 添加文件</button><button class="btn btn-secondary btn-sm" type="button" id="record-audio">${getIcon('mic', 14)} 录制语音</button><button class="btn btn-secondary btn-sm" type="button" id="record-dictate" aria-pressed="false" title="把说的话转成正文">${getIcon('sparkles', 14)} 语音转文字</button><span class="field-hint">照片 / 语音 / 视频 / 文档，单个不超过 2MB</span></div><input type="file" id="attachment-input" multiple hidden accept="image/*,audio/*,video/*,.txt,.md,.csv,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx"><div class="editor-dropzone" id="editor-dropzone">${getIcon('upload', 15)}<span>把文件拖到这里，或按 Ctrl / ⌘ + V 粘贴图片</span></div><div class="editor-attachments" id="editor-attachments"></div></div></div></div><div class="modal-footer"><button class="btn btn-secondary" type="button" data-close>取消</button><button class="btn btn-primary" type="submit" id="save-record">${getIcon('check', 16)} ${existing ? '保存修改' : '存入时光'}</button></div></form></div>`;
+    overlay.innerHTML = `<div class="modal modal-lg" role="dialog" aria-modal="true"><form id="record-form"><div class="modal-header"><div><div class="eyebrow">${existing ? 'EDIT MEMORY' : 'CAPTURE THE MOMENT'}</div><h3 class="modal-title">${existing ? '编辑记忆' : '此刻，值得留下'}</h3></div><button class="btn btn-ghost btn-icon" type="button" data-close>${getIcon('x')}</button></div><div class="modal-body"><div class="form-stack"><div class="draft-notice" id="draft-notice" hidden><span></span><button type="button" class="btn btn-ghost btn-sm" id="discard-draft">丢弃草稿</button></div><div class="field"><label class="field-label" for="record-title">标题</label><input class="input" id="record-title" maxlength="80" value="${esc(record.title)}" placeholder="给这段记忆一个名字，留空将自动截取正文"></div><div class="field"><label class="field-label" for="record-content">正文</label><textarea class="textarea" id="record-content" style="min-height:160px" placeholder="发生了什么？当时的你在想什么？">${esc(record.content)}</textarea></div><div class="form-grid"><div class="field"><label class="field-label" for="record-type">记忆类型</label><select class="select" id="record-type">${Object.entries(typeMap).map(([key, value]) => `<option value="${key}" ${record.type === key ? 'selected' : ''}>${value[0]}</option>`).join('')}</select></div><div class="field"><label class="field-label" for="record-date">发生时间</label><input class="input" id="record-date" type="datetime-local" value="${dateValue}" required></div><div class="field"><label class="field-label" for="record-mood">此刻心情</label><select class="select" id="record-mood">${['平静', '愉快', '有收获', '专注', '充实', '轻松', '期待', '温暖', '兴奋', '反思', '疲惫', '低落'].map(mood => `<option ${record.mood === mood ? 'selected' : ''}>${mood}</option>`).join('')}</select></div><div class="field"><label class="field-label" for="record-tags">标签</label><input class="input" id="record-tags" value="${esc(record.tags.join('，'))}" placeholder="学习，阅读（用逗号分隔）"><div class="tag-suggest" id="tag-suggest" aria-live="polite" hidden></div></div></div>${capsuleHTML}<div class="field"><span class="field-label">附件</span><div class="row wrap"><button class="btn btn-secondary btn-sm" type="button" id="add-attachment">${getIcon('upload', 14)} 添加文件</button><button class="btn btn-secondary btn-sm" type="button" id="record-audio">${getIcon('mic', 14)} 录制语音</button><button class="btn btn-secondary btn-sm" type="button" id="record-dictate" aria-pressed="false" title="把说的话转成正文">${getIcon('sparkles', 14)} 语音转文字</button><span class="field-hint">照片 / 语音 / 视频 / 文档，单个不超过 2MB</span></div><input type="file" id="attachment-input" multiple hidden accept="image/*,audio/*,video/*,.txt,.md,.csv,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx"><div class="editor-dropzone" id="editor-dropzone">${getIcon('upload', 15)}<span>把文件拖到这里，或按 Ctrl / ⌘ + V 粘贴图片</span></div><div class="editor-attachments" id="editor-attachments"></div></div></div></div><div class="modal-footer"><button class="btn btn-secondary" type="button" data-close>取消</button><button class="btn btn-primary" type="submit" id="save-record">${getIcon('check', 16)} ${existing ? '保存修改' : '存入时光'}</button></div></form></div>`;
     document.body.appendChild(overlay);
+    const capsuleToggle = overlay.querySelector('#record-capsule');
+    if (capsuleToggle) capsuleToggle.onchange = () => {
+      const wrap = overlay.querySelector('#capsule-date');
+      wrap.hidden = !capsuleToggle.checked;
+      if (capsuleToggle.checked) overlay.querySelector('#record-unlock').focus();
+    };
     const renderAttachments = () => { overlay.querySelector('#editor-attachments').innerHTML = attachments.map((file, index) => `<div class="editor-attachment">${getIcon(typeMap[file.type]?.[1] || 'file', 15)}<span>${esc(file.name)} · ${fileSize(file.size)}</span><button type="button" class="btn btn-ghost btn-icon btn-sm" data-remove-file="${index}" aria-label="移除附件">${getIcon('x', 14)}</button></div>`).join(''); };
     renderAttachments();
     const draftNotice = overlay.querySelector('#draft-notice');
@@ -1515,9 +1555,24 @@
         attachments, isSample: false
       };
       try {
-        const saved = existing ? MemoryStore.updateRecord(id, payload) : MemoryStore.createRecord(payload);
+        const sealing = !existing && Boolean(capsuleToggle?.checked);
+        let saved;
+        if (sealing) {
+          const rawDate = overlay.querySelector('#record-unlock').value;
+          const unlockAt = rawDate ? new Date(`${rawDate}T23:59:59`).getTime() : 0;
+          if (!unlockAt || unlockAt <= Date.now()) {
+            showToast('开启日期需要晚于今天，才能封存。', 'error');
+            button.disabled = false; button.textContent = '重新保存';
+            return;
+          }
+          saved = MemoryStore.createCapsule(payload, unlockAt);
+        } else {
+          saved = existing ? MemoryStore.updateRecord(id, payload) : MemoryStore.createRecord(payload);
+        }
         draftState.saved = true; clearRecordDraft(); draftNotice.hidden = true;
-        closeEditor(); showToast(existing ? '修改已保存' : '这一刻，已存入时光', 'success'); onSaved?.(saved);
+        closeEditor();
+        showToast(sealing ? '已封存，等那一天再打开' : existing ? '修改已保存' : '这一刻，已存入时光', 'success');
+        onSaved?.(saved);
       } catch (error) { showToast(error.message, 'error', 5000); button.disabled = false; button.textContent = '重新保存'; }
     };
     setTimeout(() => overlay.querySelector('#record-title').focus(), 50);

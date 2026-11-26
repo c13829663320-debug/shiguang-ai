@@ -12,14 +12,14 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" type="image/png" href="icons/icon-192.png">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
-  <link rel="stylesheet" href="styles.css?v=20">
+  <link rel="stylesheet" href="styles.css?v=22">
 </head>
 <body>
   <div id="app"></div>
 
-  <script src="mock.js?v=20"></script>
+  <script src="mock.js?v=22"></script>
   <script src="api.js?v=20"></script>
-  <script src="components.js?v=21"></script>
+  <script src="components.js?v=22"></script>
   <script>
     (function () {
       const app = document.getElementById('app');
@@ -75,6 +75,7 @@
                 <button class="pill ${state.tag ? '' : 'active'}" data-tag="">不限</button>
                 ${tags.map(tag => `<button class="pill ${state.tag === tag.name ? 'active' : ''}" data-tag="${SG.esc(tag.name)}">${SG.esc(tag.name)} · ${tag.count}</button>`).join('')}
               </div>` : ''}
+              <div id="capsules-root"></div>
               <div id="calendar-root"></div>
               <div id="timeline-root"></div>
             </div>
@@ -117,6 +118,35 @@
         };
         renderCalendar();
         renderList();
+        renderCapsules();
+        if (window.location.hash === '#capsules') {
+          const target = document.getElementById('capsules');
+          if (target) setTimeout(() => target.scrollIntoView({ behavior: 'smooth', block: 'start' }), 120);
+        }
+      }
+
+      function renderCapsules() {
+        const root = document.getElementById('capsules-root');
+        if (!root) return;
+        const capsules = MemoryStore.capsules();
+        if (!capsules.length) { root.innerHTML = ''; return; }
+        root.innerHTML = `<section class="capsule-section" id="capsules">
+          <div class="section-head">
+            <div><div class="section-kicker">TIME CAPSULES</div><h2 class="section-title">沉睡的时间胶囊</h2></div>
+            <span class="section-note">${capsules.length} 枚封存中，到期自动开启</span>
+          </div>
+          <div class="capsule-grid">${capsules.map(item => {
+            const days = Math.max(1, Math.ceil((Number(item.unlockAt) - Date.now()) / 86400000));
+            const unlock = new Date(Number(item.unlockAt));
+            return `<button class="capsule-card" data-capsule="${item.id}" aria-label="查看时间胶囊：${SG.esc(item.title)}">
+              <span class="capsule-lock">${getIcon('lock', 18)}</span>
+              <span class="capsule-title">${SG.esc(item.title)}</span>
+              <span class="capsule-days"><strong>${days}</strong> 天后开启</span>
+              <span class="capsule-meta">${unlock.getFullYear()} 年 ${unlock.getMonth() + 1} 月 ${unlock.getDate()} 日</span>
+            </button>`;
+          }).join('')}</div>
+        </section>`;
+        root.querySelectorAll('[data-capsule]').forEach(card => card.onclick = () => openCapsule(card.dataset.capsule));
       }
 
       function renderCalendar() {
@@ -312,7 +342,7 @@
         });
       };
 
-      window.addEventListener('shiguang:change', () => { renderCalendar(); renderList(); });
+      window.addEventListener('shiguang:change', () => { renderCalendar(); renderList(); renderCapsules(); });
       render();
     })();
   </script>

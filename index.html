@@ -12,14 +12,14 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" type="image/png" href="icons/icon-192.png">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
-  <link rel="stylesheet" href="styles.css?v=20">
+  <link rel="stylesheet" href="styles.css?v=22">
 </head>
 <body>
   <div id="app"></div>
 
-  <script src="mock.js?v=20"></script>
+  <script src="mock.js?v=22"></script>
   <script src="api.js?v=20"></script>
-  <script src="components.js?v=21"></script>
+  <script src="components.js?v=22"></script>
   <script>
     (function () {
       const app = document.getElementById('app');
@@ -91,6 +91,13 @@
         const topTag = stats.tags[0];
         const topMood = MemoryStore.moods()[0];
         const echo = MemoryStore.onThisDay(3);
+        const capsules = MemoryStore.capsules();
+        const capsuleBanner = capsules.length ? (() => {
+          const nearest = capsules[0];
+          const days = Math.max(1, Math.ceil((Number(nearest.unlockAt) - Date.now()) / 86400000));
+          const unlock = new Date(Number(nearest.unlockAt));
+          return `<a class="capsule-banner" href="history.html#capsules"><span class="capsule-banner-icon">${getIcon('lock', 20)}</span><span class="capsule-banner-body"><strong>${capsules.length} 枚时间胶囊沉睡中</strong><span>最近一枚还有 ${days} 天开启 · ${unlock.getMonth() + 1} 月 ${unlock.getDate()} 日</span></span><span class="capsule-banner-link">去看看 ${getIcon('right', 15)}</span></a>`;
+        })() : '';
 
         app.innerHTML = `
           ${renderSidebar('home')}
@@ -138,6 +145,8 @@
               </div>
 
               ${topTag ? `<div class="insight-strip"><span class="insight-label">本周洞察</span><span class="insight-text">最近最常见的主题是 <strong>「${SG.esc(topTag.name)}」</strong>（${topTag.count} 次），高频心情是 <strong>「${topMood ? SG.esc(topMood.name) : '平静'}」</strong>。坚持记录，它们会在周复盘中变成洞察。</span><a class="insight-link" href="insights.html" aria-label="查看主题洞察">${getIcon('right', 16)}</a></div>` : `<div class="insight-strip"><span class="insight-label">本周洞察</span><span class="insight-text">还没有足够的记录。留下第一条，洞察会随之出现。</span><a class="insight-link" href="insights.html" aria-label="查看主题洞察">${getIcon('right', 16)}</a></div>`}
+
+              ${capsuleBanner}
 
               ${echoSection(echo)}
 
