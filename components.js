@@ -1048,6 +1048,106 @@
     paint();
   };
 
+  window.openAnnualPoster = function (year) {
+    const data = MemoryStore.annual(year);
+    if (!data.total) { showToast(`${data.year} 年还没有记忆，先留下一条再来生成年度长图。`, 'error'); return; }
+    const W = 1080; const H = 1860; const LEFT = 96; const CONTENT = W - LEFT * 2;
+    const SERIF = LONG_SERIF; const SANS = LONG_SANS;
+    const canvas = document.createElement('canvas'); canvas.width = W; canvas.height = H;
+    const ctx = canvas.getContext('2d');
+    const fmt = timestamp => {
+      const date = new Date(timestamp);
+      return `${date.getFullYear()}.${String(date.getMonth() + 1).padStart(2, '0')}.${String(date.getDate()).padStart(2, '0')}`;
+    };
+    const sectionTitle = (text, y) => {
+      ctx.fillStyle = '#d6a84b'; ctx.fillRect(LEFT, y - 18, 24, 3);
+      ctx.fillStyle = '#1e2623'; ctx.font = `700 28px ${SERIF}`; ctx.textAlign = 'left'; ctx.fillText(text, LEFT, y + 12);
+    };
+
+    ctx.fillStyle = '#f6f3ed'; ctx.fillRect(0, 0, W, H);
+    ctx.strokeStyle = '#dedbd2'; ctx.lineWidth = 2; ctx.strokeRect(56, 56, W - 112, H - 112);
+    ctx.strokeStyle = 'rgba(231,111,81,.12)'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(W - 90, 190, 96, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.arc(W - 90, 190, 138, 0, Math.PI * 2); ctx.stroke();
+
+    ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'left';
+    ctx.fillStyle = '#e76f51'; ctx.beginPath(); ctx.arc(LEFT + 9, 128, 9, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#1e2623'; ctx.font = `700 30px ${SERIF}`; ctx.fillText('拾光AI', LEFT + 32, 140);
+    ctx.fillStyle = '#89908a'; ctx.font = `600 15px ${SANS}`; ctx.textAlign = 'right'; ctx.fillText('YEAR IN MEMORY', W - LEFT, 138); ctx.textAlign = 'left';
+    ctx.fillStyle = '#dedbd2'; ctx.fillRect(LEFT, 176, CONTENT, 1);
+
+    ctx.fillStyle = '#1e2623'; ctx.font = `700 150px ${SERIF}`; ctx.fillText(String(data.year), LEFT - 4, 340);
+    ctx.font = `700 40px ${SERIF}`; ctx.fillText(`这一年，你留下了 ${data.total} 条记忆。`, LEFT, 412);
+    ctx.fillStyle = '#53605a'; ctx.font = `500 22px ${SANS}`;
+    ctx.fillText(`${fmt(data.first.occurredAt)} — ${fmt(data.last.occurredAt)} · ${data.words} 个字 · ${data.activeDays} 天有记录`, LEFT, 456);
+
+    ctx.fillStyle = '#efece3'; canvasRoundRect(ctx, LEFT, 500, CONTENT, 142, 18); ctx.fill();
+    const stats = [['记录条数', data.total], ['记录天数', data.activeDays], ['写下字数', data.words], ['最长连续', `${data.longestStreak} 天`]];
+    stats.forEach(([label, value], index) => {
+      const center = LEFT + CONTENT / 8 + index * CONTENT / 4;
+      if (index) { ctx.fillStyle = '#dedbd2'; ctx.fillRect(LEFT + index * CONTENT / 4, 528, 1, 86); }
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#1e2623'; ctx.font = `700 42px ${SERIF}`; ctx.fillText(String(value), center, 572);
+      ctx.fillStyle = '#89908a'; ctx.font = `500 18px ${SANS}`; ctx.fillText(label, center, 610);
+    });
+    ctx.textAlign = 'left';
+
+    sectionTitle('月度轨迹', 712);
+    const barBase = 986; const barMax = 196; const barWidth = 46; const gap = 26;
+    const maxCount = Math.max(...data.months.map(month => month.count), 1);
+    const chartStart = LEFT + (CONTENT - (12 * barWidth + 11 * gap)) / 2;
+    data.months.forEach((month, index) => {
+      const height = month.count ? Math.max(10, Math.round(month.count / maxCount * barMax)) : 4;
+      const x = chartStart + index * (barWidth + gap);
+      ctx.fillStyle = month.count ? (index === data.busiestMonth.month - 1 ? '#d6a84b' : '#2a6f6a') : '#e4e0d6';
+      canvasRoundRect(ctx, x, barBase - height, barWidth, height, 6); ctx.fill();
+      ctx.textAlign = 'center';
+      if (month.count) { ctx.fillStyle = '#89908a'; ctx.font = `500 16px ${SANS}`; ctx.fillText(String(month.count), x + barWidth / 2, barBase - height - 12); }
+      ctx.fillStyle = '#89908a'; ctx.font = `500 16px ${SANS}`; ctx.fillText(`${month.month}月`, x + barWidth / 2, barBase + 30);
+    });
+    ctx.textAlign = 'left';
+
+    sectionTitle('年度关键词', 1104);
+    if (!data.tags.length) { ctx.fillStyle = '#89908a'; ctx.font = `500 20px ${SANS}`; ctx.fillText('这一年的记忆还没有标签。', LEFT, 1160); }
+    const drawChips = (items, startY, background, color) => {
+      let x = LEFT; let y = startY;
+      items.forEach(item => {
+        const label = `${item.name} · ${item.count}`;
+        ctx.font = `600 22px ${SANS}`;
+        const width = ctx.measureText(label).width + 38;
+        if (x + width > W - LEFT) { x = LEFT; y += 50; }
+        ctx.fillStyle = background; canvasRoundRect(ctx, x, y, width, 38, 19); ctx.fill();
+        ctx.fillStyle = color; ctx.font = `600 22px ${SANS}`; ctx.fillText(label, x + 19, y + 26);
+        x += width + 12;
+      });
+    };
+    drawChips(data.tags.slice(0, 6), 1136, '#dfece8', '#2a6f6a');
+
+    sectionTitle('心情底色', 1286);
+    drawChips(data.moods.slice(0, 4), 1318, '#f3e7d3', '#a8781f');
+
+    sectionTitle('代表记忆', 1420);
+    let highlightY = 1470;
+    data.highlights.slice(0, 3).forEach((record, index) => {
+      ctx.fillStyle = '#d6a84b'; ctx.font = `700 20px ${SANS}`; ctx.fillText(`0${index + 1}`, LEFT, highlightY);
+      ctx.fillStyle = '#1e2623'; ctx.font = `700 26px ${SERIF}`;
+      ctx.fillText(longTextLines(ctx, record.title, CONTENT - 260, 1)[0], LEFT + 58, highlightY);
+      ctx.fillStyle = '#89908a'; ctx.font = `500 18px ${SANS}`; ctx.textAlign = 'right';
+      ctx.fillText(fmt(record.occurredAt), W - LEFT, highlightY); ctx.textAlign = 'left';
+      highlightY += 58;
+    });
+
+    ctx.fillStyle = '#dedbd2'; ctx.fillRect(LEFT, 1660, CONTENT, 1);
+    ctx.fillStyle = '#1e2623'; ctx.font = `700 30px ${SERIF}`; ctx.fillText('记录，是对时间最温柔的抵抗。', LEFT, 1712);
+    ctx.fillStyle = '#89908a'; ctx.font = `500 19px ${SANS}`; ctx.fillText(`${data.year} · 拾光AI · 本地记忆档案`, LEFT, 1756);
+
+    const filename = `拾光AI-${data.year}年度回顾.png`;
+    canvas.toBlob(blob => {
+      if (!blob) { showToast('年度长图生成失败，请稍后重试。', 'error'); return; }
+      openLongImagePreview({ url: URL.createObjectURL(blob), blob, filename, count: data.total, label: `${data.year} 年度回顾` });
+    }, 'image/png');
+  };
+
   window.openDailyReview = function () {
     const record = MemoryStore.dailyReview();
     if (!record) { showToast('还没有可以回顾的旧记忆，再多记录几天吧。', 'info'); return; }

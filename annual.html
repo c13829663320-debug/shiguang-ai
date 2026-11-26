@@ -19,7 +19,7 @@
 
   <script src="mock.js?v=20"></script>
   <script src="api.js?v=20"></script>
-  <script src="components.js?v=20"></script>
+  <script src="components.js?v=21"></script>
   <script>
     (function () {
       const app = document.getElementById('app');
@@ -38,6 +38,7 @@
               title: '年度回顾', subtitle: `${data.year} 年的记忆故事`,
               actions: `
                 ${years.length > 1 ? `<select class="select annual-select" id="year-select" aria-label="选择年份">${years.map(year => `<option value="${year}" ${year === state.year ? 'selected' : ''}>${year} 年</option>`).join('')}</select>` : ''}
+                ${data.total ? `<button class="btn btn-secondary" id="annual-export">${getIcon('image', 16)}<span class="optional"> 年度长图</span></button>` : ''}
                 <button class="btn btn-primary" data-action="new-record">${getIcon('plus', 16)} 记一笔</button>`
             })}
             <div class="page-content narrow">
@@ -112,6 +113,8 @@
 
         const yearSelect = document.getElementById('year-select');
         if (yearSelect) yearSelect.onchange = () => { state.year = Number(yearSelect.value); render(); };
+        const exportBtn = document.getElementById('annual-export');
+        if (exportBtn) exportBtn.onclick = () => openAnnualPoster(state.year);
         app.querySelectorAll('[data-record]').forEach(button => {
           button.onclick = () => openRecordDetail(button.dataset.record);
         });
