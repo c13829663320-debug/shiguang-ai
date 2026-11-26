@@ -12,12 +12,12 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" type="image/png" href="icons/icon-192.png">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
-  <link rel="stylesheet" href="styles.css?v=22">
+  <link rel="stylesheet" href="styles.css?v=23">
 </head>
 <body>
   <div id="app"></div>
 
-  <script src="mock.js?v=22"></script>
+  <script src="mock.js?v=23"></script>
   <script src="api.js?v=20"></script>
   <script src="components.js?v=22"></script>
   <script>
@@ -25,6 +25,8 @@
       const app = document.getElementById('app');
       const params = new URLSearchParams(location.search);
       const state = { query: params.get('query') || '', type: params.get('type') || '', tag: params.get('tag') || '', pinned: false, day: null };
+      let selecting = false;
+      const selected = new Set();
       const startToday = new Date(); startToday.setHours(0, 0, 0, 0);
       let cal = { year: startToday.getFullYear(), month: startToday.getMonth() };
       const dateParam = params.get('date');
@@ -51,6 +53,7 @@
       }
 
       function render() {
+        selecting = false; selected.clear();
         const tags = MemoryStore.tags().slice(0, 8);
         app.innerHTML = `
           ${renderSidebar('history')}
@@ -263,12 +266,14 @@
         const query = state.query.trim();
         const records = sortedRecords();
         const suggestions = suggestKeywords();
+        if (!records.length) { selecting = false; selected.clear(); }
         root.innerHTML = records.length ? `
           <div class="section-head" style="margin-bottom:20px">
             <div><div class="section-kicker">${query ? 'SEARCH RESULTS' : 'TIMELINE'}</div><h2 class="section-title">${query ? `找到 ${records.length} 条相关记忆` : `共 ${records.length} 条记忆`}</h2></div>
             <div class="row wrap">
               ${query ? `<span class="muted small">按相关度排序</span>` : ''}
               ${state.day ? `<button class="btn btn-ghost btn-sm" id="clear-day-inline">${getIcon('x', 13)} ${SG.formatDate(state.day)}</button>` : ''}
+              <button class="btn btn-secondary btn-sm" id="toggle-select">${getIcon('check', 13)} ${selecting ? '退出批量' : '批量管理'}</button>
             </div>
           </div>
           ${query ? `<div class="search-results">${records.map(item => recordItem(item, true)).join('')}</div>` : `<div class="timeline">${buildTimeline(records)}</div>`}` :
@@ -289,12 +294,130 @@
         root.querySelector('#clear-day-inline')?.addEventListener('click', () => {
           state.day = null; renderCalendar(); renderList();
         });
+        root.querySelector('#toggle-select')?.addEventListener('click', () => {
+          selecting = !selecting; selected.clear(); renderList();
+        });
+        paintBatchBar(records);
+      }
+
+      // 批量栏挂到 body：页面内容存在 transform 动画，fixed 元素若放在内部会以内容块为包含块。
+      function paintBatchBar(records) {
+        document.querySelector('.batch-bar')?.remove();
+        if (!selecting) return;
+        const bar = document.createElement('div');
+        bar.className = 'batch-bar';
+        bar.setAttribute('role', 'region');
+        bar.setAttribute('aria-label', '批量操作');
+        bar.innerHTML = `<span class="batch-count">已选 <strong>${selected.size}</strong> 条</span>
+          <button class="btn btn-ghost btn-sm" id="batch-select-all">${selected.size >= records.length ? '取消全选' : '全选'}</button>
+          <span class="batch-sep" aria-hidden="true"></span>
+          <button class="btn btn-secondary btn-sm" id="batch-pin">${getIcon('pin', 13)} 置顶</button>
+          <button class="btn btn-secondary btn-sm" id="batch-unpin">取消置顶</button>
+          <button class="btn btn-secondary btn-sm" id="batch-tag">${getIcon('tag', 13)} 加标签</button>
+          <button class="btn btn-danger btn-sm" id="batch-delete">${getIcon('trash', 13)} 删除</button>
+          <button class="btn btn-ghost btn-sm" id="batch-cancel">${getIcon('x', 13)} 退出</button>`;
+        document.body.appendChild(bar);
+        bar.querySelector('#batch-select-all').onclick = () => {
+          const ids = records.map(item => item.id);
+          if (selected.size >= ids.length) selected.clear();
+          else ids.forEach(id => selected.add(id));
+          paintSelection();
+        };
+        bar.querySelector('#batch-pin').onclick = () => batchPin(true);
+        bar.querySelector('#batch-unpin').onclick = () => batchPin(false);
+        bar.querySelector('#batch-tag').onclick = openBatchTag;
+        bar.querySelector('#batch-delete').onclick = batchDelete;
+        bar.querySelector('#batch-cancel').onclick = () => { selecting = false; selected.clear(); renderList(); };
+      }
+
+      function selectedIds() {
+        return [...selected].filter(id => MemoryStore.getRecord(id));
+      }
+
+      function paintSelection() {
+        const cards = document.querySelectorAll('.timeline-item[data-record-id]');
+        cards.forEach(card => {
+          const on = selected.has(card.dataset.recordId);
+          card.classList.toggle('selected', on);
+          card.setAttribute('aria-pressed', String(on));
+          const check = card.querySelector('.select-check');
+          if (check) { check.classList.toggle('on', on); check.innerHTML = on ? getIcon('check', 13) : ''; }
+        });
+        const count = document.querySelector('.batch-count strong');
+        if (count) count.textContent = selected.size;
+        const allBtn = document.getElementById('batch-select-all');
+        if (allBtn) allBtn.textContent = cards.length && selected.size >= cards.length ? '取消全选' : '全选';
+      }
+
+      window.toggleRecordSelect = (id, event) => {
+        if (event) event.stopPropagation();
+        if (selected.has(id)) selected.delete(id);
+        else selected.add(id);
+        paintSelection();
+      };
+
+      function batchPin(pinned) {
+        const ids = selectedIds();
+        if (!ids.length) { showToast('先选择至少一条记忆。', 'info'); return; }
+        const count = MemoryStore.batchUpdate(ids, { pinned });
+        showToast(pinned ? `已置顶 ${count} 条记忆` : `已取消 ${count} 条置顶`, 'success');
+      }
+
+      function batchDelete() {
+        const ids = selectedIds();
+        if (!ids.length) { showToast('先选择至少一条记忆。', 'info'); return; }
+        showConfirm({
+          title: `删除 ${ids.length} 条记忆？`,
+          message: '它们会被移到回收站，30 天内可以恢复。',
+          confirmText: '移到回收站',
+          onConfirm: () => {
+            selecting = false; selected.clear();
+            const removed = MemoryStore.batchDelete(ids);
+            showToast(`已删除 ${removed.length} 条记忆`, 'success', 5200, {
+              label: '撤销',
+              onClick: () => {
+                removed.forEach(record => MemoryStore.restoreRecord(record.id));
+                showToast('已恢复所选记忆', 'success');
+              }
+            });
+          }
+        });
+      }
+
+      function openBatchTag() {
+        const ids = selectedIds();
+        if (!ids.length) { showToast('先选择至少一条记忆。', 'info'); return; }
+        const tags = MemoryStore.tags().slice(0, 12);
+        const overlay = document.createElement('div');
+        overlay.className = 'modal-overlay';
+        overlay.innerHTML = `<div class="modal modal-sm" role="dialog" aria-modal="true"><div class="modal-header"><h3 class="modal-title">为 ${ids.length} 条记忆加标签</h3><button class="btn btn-ghost btn-icon" data-close>${getIcon('x')}</button></div><div class="modal-body">${tags.length ? `<div class="tag-picker">${tags.map(tag => `<button class="pill" data-pick-tag="${SG.esc(tag.name)}">${SG.esc(tag.name)}</button>`).join('')}</div>` : ''}<input class="input" id="batch-tag-input" maxlength="12" placeholder="输入新标签，或点选上方已有标签" aria-label="标签名称"><p class="field-hint">标签会追加到所选记忆，每条最多保留 8 个。</p></div><div class="modal-footer"><button class="btn btn-secondary" data-close>取消</button><button class="btn btn-primary" id="batch-tag-confirm">添加标签</button></div></div>`;
+        document.body.appendChild(overlay);
+        const input = overlay.querySelector('#batch-tag-input');
+        const close = () => overlay.remove();
+        overlay.querySelectorAll('[data-close]').forEach(btn => btn.onclick = close);
+        overlay.addEventListener('click', event => { if (event.target === overlay) close(); });
+        overlay.querySelectorAll('[data-pick-tag]').forEach(btn => btn.onclick = () => { input.value = btn.dataset.pickTag; input.focus(); });
+        const apply = () => {
+          const value = input.value.trim();
+          if (!value) { input.focus(); showToast('请选择或输入一个标签。', 'error'); return; }
+          const count = MemoryStore.batchAddTag(ids, value);
+          close();
+          showToast(count ? `已为 ${count} 条记忆加上「${value}」` : `所选记忆都已带有「${value}」`, count ? 'success' : 'info');
+        };
+        overlay.querySelector('#batch-tag-confirm').onclick = apply;
+        input.addEventListener('keydown', event => { if (event.key === 'Enter') { event.preventDefault(); apply(); } });
+        input.focus();
       }
 
       function recordItem(item, withDate) {
         const [typeName, icon] = SG.typeMap[item.type] || SG.typeMap.text;
         const excerpt = item.content || item.attachments.map(file => file.name).join('、') || '暂无文字描述';
-        return `<article class="card timeline-item" tabindex="0" data-clickable aria-label="打开记忆：${SG.esc(item.title)}" onclick="openRecordDetail('${item.id}')">
+        const isSelected = selected.has(item.id);
+        const clickAttrs = selecting
+          ? `aria-pressed="${isSelected}" onclick="toggleRecordSelect('${item.id}', event)"`
+          : `onclick="openRecordDetail('${item.id}')"`;
+        return `<article class="card timeline-item ${selecting ? 'selectable' : ''} ${isSelected ? 'selected' : ''}" data-record-id="${item.id}" tabindex="0" data-clickable aria-label="${selecting ? '选择记忆：' : '打开记忆：'}${SG.esc(item.title)}" ${clickAttrs}>
+          ${selecting ? `<span class="select-check ${isSelected ? 'on' : ''}" aria-hidden="true">${isSelected ? getIcon('check', 13) : ''}</span>` : ''}
           <div style="min-width:0">
             <span class="memory-type">${getIcon(icon, 14)} ${typeName}${item.pinned ? ' · <span class="pin-mark">置顶</span>' : ''}${withDate ? `<span class="result-date">${SG.formatDate(item.occurredAt, false)}</span>` : ''}</span>
             <h3 class="memory-title">${SG.highlight(item.title, state.query)}</h3>
@@ -303,11 +426,11 @@
           </div>
           <div>
             <div class="timeline-time">${SG.formatTime(item.occurredAt)}</div>
-            <div class="timeline-actions">
+            ${selecting ? '' : `<div class="timeline-actions">
               <button class="btn btn-ghost btn-sm" title="置顶" onclick="pinRecord('${item.id}', event)">${getIcon('pin', 15)}</button>
               <button class="btn btn-ghost btn-sm" title="编辑" onclick="editRecord('${item.id}', event)">${getIcon('edit', 15)}</button>
               <button class="btn btn-ghost btn-sm" title="删除" onclick="removeRecord('${item.id}', event)">${getIcon('trash', 15)}</button>
-            </div>
+            </div>`}
           </div>
         </article>`;
       }
@@ -343,6 +466,11 @@
       };
 
       window.addEventListener('shiguang:change', () => { renderCalendar(); renderList(); renderCapsules(); });
+      document.addEventListener('keydown', event => {
+        if (event.key !== 'Escape' || !selecting) return;
+        if (document.querySelector('.modal-overlay')) return;
+        selecting = false; selected.clear(); renderList();
+      });
       render();
     })();
   </script>

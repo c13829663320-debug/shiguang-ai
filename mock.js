@@ -239,6 +239,42 @@
       if (!record) return null;
       record.pinned = !record.pinned; record.updatedAt = Date.now(); persist(); return clone(record);
     },
+    // 批量操作：一次写入、一次通知，避免逐条保存造成的重复渲染。
+    batchUpdate(ids, patch) {
+      const set = new Set(ids);
+      let count = 0;
+      db.records = db.records.map(record => {
+        if (!set.has(record.id)) return record;
+        count += 1;
+        return normalizeRecord({ ...record, ...patch }, record);
+      });
+      if (count) persist();
+      return count;
+    },
+    batchAddTag(ids, tag) {
+      const label = String(tag || '').trim();
+      if (!label) return 0;
+      const set = new Set(ids);
+      let count = 0;
+      db.records = db.records.map(record => {
+        if (!set.has(record.id) || record.tags.includes(label)) return record;
+        count += 1;
+        return normalizeRecord({ ...record, tags: [...record.tags, label] }, record);
+      });
+      if (count) persist();
+      return count;
+    },
+    batchDelete(ids) {
+      const set = new Set(ids);
+      const removed = db.records.filter(record => set.has(record.id));
+      if (!removed.length) return [];
+      db.records = db.records.filter(record => !set.has(record.id));
+      const now = Date.now();
+      removed.forEach(record => { record.deletedAt = now; });
+      db.trash.unshift(...removed);
+      persist();
+      return clone(removed);
+    },
     relatedRecords(id, limit = 3) {
       const target = db.records.find(item => item.id === id);
       if (!target) return [];

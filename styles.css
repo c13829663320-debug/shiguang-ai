@@ -216,6 +216,21 @@ svg { flex: 0 0 auto; }
 .timeline-item .memory-excerpt { -webkit-line-clamp: 2; }
 .timeline-time { color: var(--muted); font: 11px var(--mono); }
 .timeline-actions { display: flex; align-items: flex-start; gap: 3px; }
+/* 批量管理 */
+.timeline-item.selectable { grid-template-columns: auto minmax(0, 1fr) auto; }
+.timeline-item.selectable:hover { transform: none; }
+.timeline-item.selected { border-color: var(--teal); background: var(--teal-soft); }
+.select-check { display: grid; place-items: center; width: 22px; height: 22px; margin-top: 2px; border: 1.5px solid var(--line-strong); border-radius: 7px; background: var(--card); color: #fff; transition: background .16s, border-color .16s; }
+.select-check.on { border-color: var(--teal); background: var(--teal); }
+.batch-bar { position: fixed; left: 50%; bottom: 26px; z-index: 60; display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 8px; max-width: calc(100vw - 32px); padding: 10px 14px; border: 1px solid var(--line); border-radius: 16px; background: var(--card); box-shadow: var(--shadow-float); transform: translateX(-50%); animation: modal-in .18s ease; }
+.batch-count { color: var(--ink-soft); font-size: 12px; white-space: nowrap; }
+.batch-count strong { color: var(--coral-dark); font-size: 14px; }
+.batch-sep { width: 1px; height: 20px; background: var(--line); }
+.tag-picker { display: flex; flex-wrap: wrap; gap: 6px; max-height: 132px; margin-bottom: 12px; overflow: auto; }
+@media (max-width: 720px) {
+  .batch-bar { left: 12px; right: 12px; bottom: 14px; justify-content: flex-start; max-width: none; transform: none; }
+  .batch-sep { display: none; }
+}
 .empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 300px; padding: 44px 24px; border: 1px dashed var(--line-strong); border-radius: var(--radius-lg); text-align: center; }
 .empty-illustration { width: 100%; max-width: 320px; margin: 0 auto 4px; mix-blend-mode: multiply; }
 .empty-icon { display: grid; place-items: center; width: 60px; height: 60px; margin-bottom: 16px; border-radius: 50%; background: var(--paper-deep); color: var(--coral); }
