@@ -247,6 +247,27 @@
           </div>`;
       }
 
+      // 组装可复制的洞察摘要：总量、主题、心情、时段与分布。
+      function insightsPlainText(data) {
+        const typeLine = data.types.map(item => `${SG.typeMap[item.name]?.[0] || item.name} ${item.count}`).join(' · ');
+        const tagLine = data.tags.slice(0, 5).map(item => `${item.name} ${item.count}`).join(' · ');
+        const moodLine = data.moods.slice(0, 4).map(item => `${item.name} ${item.count}`).join(' · ');
+        const busyDay = data.weekday.some(count => count > 0) ? `周${WEEKDAYS[data.busiestWeekday]}` : '—';
+        return [
+          `【拾光洞察】${new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' })}`,
+          `共 ${data.total} 条记忆，分布在 ${data.activeDays} 天里，平均每周 ${data.averagePerWeek} 条。`,
+          '',
+          `最常记录的主题：${data.topTag?.name || '暂无'}（${data.topTag?.count || 0} 次）`,
+          `高频心情：${data.topMood?.name || '暂无'}（${data.topMood?.count || 0} 次）`,
+          `记录最集中的时段：${data.peakPeriod?.label || '—'}`,
+          `最常记录的日子：${busyDay}`,
+          '',
+          `类型分布：${typeLine || '暂无'}`,
+          `常用标签：${tagLine || '暂无'}`,
+          `心情分布：${moodLine || '暂无'}`
+        ].join('\n');
+      }
+
       function render() {
         const data = MemoryStore.insights();
         const hasRecords = data.total > 0;
@@ -263,6 +284,7 @@
             ${renderPageHeader({
               title: '主题洞察', subtitle: '从你的记忆里，看见反复出现的主题与习惯',
               actions: `
+                ${hasRecords ? `<button class="btn btn-secondary" id="copy-insights">${getIcon('copy', 16)}<span class="optional"> 复制摘要</span></button>` : ''}
                 <a class="btn btn-secondary" href="annual.html">${getIcon('book', 16)}<span class="optional"> 年度回顾</span></a>
                 <button class="btn btn-primary" data-action="new-record">${getIcon('plus', 16)} 记一笔</button>`
             })}
@@ -351,6 +373,10 @@
           </main>`;
         renderGraph();
         renderHeatmap();
+        document.getElementById('copy-insights')?.addEventListener('click', async () => {
+          const ok = await SG.copyText(insightsPlainText(data));
+          showToast(ok ? '洞察摘要已复制' : '复制失败，请手动选择内容。', ok ? 'success' : 'error');
+        });
       }
 
       window.addEventListener('shiguang:change', render);
