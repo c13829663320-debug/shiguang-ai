@@ -326,6 +326,7 @@
       close();
       if (item.kind === 'record') window.openRecordDetail(item.id);
       else if (item.kind === 'action' && item.action === 'random') window.openRandomMemory();
+      else if (item.kind === 'action' && item.action === 'shortcuts') window.openShortcuts();
       else if (item.kind === 'action') window.openRecordEditor();
       else location.href = item.href;
     };
@@ -358,6 +359,7 @@
         })),
         ...(query ? [] : [{ kind: 'action', title: '留下此刻（新建记忆）', meta: '快速记录', icon: 'plus', group: '操作' }]),
         ...(query ? [] : [{ kind: 'action', action: 'random', title: '时光漫游（随机翻一条）', meta: '随便看看', icon: 'compass', group: '操作' }]),
+        ...(query ? [] : [{ kind: 'action', action: 'shortcuts', title: '键盘快捷键', meta: '看看能怎么更快', icon: 'info', group: '操作' }]),
         ...pages.map(page => ({ kind: 'page', href: page[1], title: page[0], titleHTML: highlight(page[0], query), meta: '页面跳转', icon: page[2], group: '页面' }))
       ];
       active = 0;
@@ -473,6 +475,11 @@
       if (event.key === 'Enter' || event.key === ' ') {
         const card = event.target.closest?.('[data-clickable]');
         if (card && event.target === card) { event.preventDefault(); card.click(); return; }
+      }
+      if (event.key === '?' || event.key === '？') {
+        const active = document.activeElement;
+        const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(active?.tagName || '') || active?.isContentEditable;
+        if (!typing) { event.preventDefault(); openShortcuts(); return; }
       }
       if (event.key === 'Escape') {
         const overlays = document.querySelectorAll('.modal-overlay');
@@ -724,6 +731,26 @@
     if (!record) { showToast('暂时没有别的记忆可以漫游了。', 'info'); return false; }
     openRecordDetail(record.id, { roam: true });
     return true;
+  };
+
+  // 键盘快捷键说明：把散落在各处、容易被忽略的快捷操作集中起来。
+  window.openShortcuts = function () {
+    const shortcuts = [
+      ['⌘ / Ctrl + K', '打开命令面板'],
+      ['← / →', '在记忆详情里切换上一条 / 下一条'],
+      ['Enter / 空格', '打开键盘聚焦的记忆卡片'],
+      ['Ctrl / ⌘ + Enter', '在编辑器里保存记忆'],
+      ['?', '打开这份快捷键说明'],
+      ['Esc', '关闭当前弹层']
+    ];
+    const overlay = document.createElement('div'); overlay.className = 'modal-overlay';
+    overlay.innerHTML = `<div class="modal modal-sm" role="dialog" aria-modal="true" aria-label="键盘快捷键"><div class="modal-header"><div><div class="eyebrow">SHORTCUTS</div><h3 class="modal-title">键盘快捷键</h3></div><button class="btn btn-ghost btn-icon" data-close aria-label="关闭">${getIcon('x')}</button></div><div class="modal-body"><div class="stack" style="gap:12px">${shortcuts.map(([key, desc]) => `<div class="row spread" style="gap:16px"><span class="small soft">${desc}</span><span class="tag mono" style="white-space:nowrap">${key}</span></div>`).join('')}</div><p class="small muted" style="margin-top:18px">在输入框、文本域里打字时不会触发单键快捷键。</p></div><div class="modal-footer"><span class="small muted">按 Esc 或点右上角关闭</span><button class="btn btn-dark btn-sm" data-close>知道了</button></div></div>`;
+    document.body.appendChild(overlay);
+    const close = () => { document.removeEventListener('keydown', onKey, true); overlay.remove(); };
+    const onKey = event => { if (event.key === 'Escape') { event.stopPropagation(); close(); } };
+    document.addEventListener('keydown', onKey, true);
+    overlay.querySelectorAll('[data-close]').forEach(btn => btn.onclick = close);
+    overlay.addEventListener('click', event => { if (event.target === overlay) close(); });
   };
 
   // 时间胶囊详情：封存期间只展示标题与日期，内容完全不渲染，避免从 DOM 泄露。

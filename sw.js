@@ -1,9 +1,9 @@
 /* 拾光AI：离线缓存。页面走网络优先，静态资源走缓存优先并在后台更新。 */
-const CACHE = 'shiguang-ai-v33';
+const CACHE = 'shiguang-ai-v34';
 const ASSETS = [
   './', './index.html', './history.html', './assistant.html', './review.html',
   './files.html', './settings.html', './insights.html', './annual.html',
-  './styles.css?v=25', './mock.js?v=25', './api.js?v=20', './components.js?v=30',
+  './styles.css?v=25', './mock.js?v=25', './api.js?v=20', './components.js?v=31',
   './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png', './icons/apple-touch-icon.png',
   './assets/shiguang-mark.svg', './assets/memory-constellation.jpg', './assets/library-empty.jpg'
 ];
