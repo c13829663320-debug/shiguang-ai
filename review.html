@@ -19,7 +19,7 @@
 
   <script src="mock.js?v=24"></script>
   <script src="api.js?v=20"></script>
-  <script src="components.js?v=25"></script>
+  <script src="components.js?v=26"></script>
   <script>
     (function () {
       const app = document.getElementById('app');
@@ -40,6 +40,24 @@
           const from = start + index * DAY; const to = from + DAY - 1;
           return { date: from, count: records.filter(item => item.occurredAt >= from && item.occurredAt <= to).length };
         });
+      }
+
+      // 组装可复制的周报纯文本：概览、三栏复盘、每日记录与本周记忆。
+      function reviewPlainText() {
+        const { start, end } = MemoryStore.weekRange(offset);
+        const records = MemoryStore.weekRecords(offset);
+        const daily = weekDaily();
+        const lines = [`【周复盘】${fmtMD(start)} – ${fmtMD(end)}`, `共 ${records.length} 条记录 · ${review.sourceMode === 'ai' ? 'AI 增强版' : '本地统计版'}`, '', review.summary || ''];
+        const section = (title, items) => {
+          if (!items || !items.length) return;
+          lines.push('', title, ...items.map((text, index) => `${index + 1}. ${text}`));
+        };
+        section('值得肯定', review.wins);
+        section('可以改进', review.challenges);
+        section('下周行动', review.nextSteps);
+        lines.push('', '每日记录', ...daily.map(day => `${fmtMD(day.date)} 周${'一二三四五六日'[new Date(day.date).getDay() - 1] || '日'}：${day.count} 条`));
+        if (records.length) lines.push('', `本周记忆（${records.length}）`, ...records.map((record, index) => `${index + 1}. ${record.title}（${SG.formatDate(record.occurredAt, false)} · ${record.mood}）`));
+        return lines.join('\n');
       }
 
       async function load() {
@@ -69,6 +87,7 @@
                   <strong>${fmtMD(start)} – ${fmtMD(end)}</strong>
                   <button class="btn btn-secondary btn-icon" id="week-next" title="下一周" ${offset <= 0 ? 'disabled' : ''}>${getIcon('right', 17)}</button>
                 </div>
+                <button class="btn btn-secondary" id="copy-review" ${loading || !review ? 'disabled' : ''}>${getIcon('copy', 16)}<span class="optional"> 复制周报</span></button>
                 <button class="btn btn-primary" id="save-review" ${loading || !review ? 'disabled' : ''}>${getIcon('check', 16)} 保存这份复盘</button>`
             })}
             <div class="page-content narrow">
@@ -130,6 +149,11 @@
           MemoryStore.saveReview({ ...review });
           showToast('这份复盘已存入档案', 'success');
           render();
+        };
+        const copyButton = document.getElementById('copy-review');
+        if (copyButton && review) copyButton.onclick = async () => {
+          const ok = await SG.copyText(reviewPlainText());
+          showToast(ok ? '本周周报已复制' : '复制失败，请手动选择内容。', ok ? 'success' : 'error');
         };
         app.querySelectorAll('[data-week]').forEach(btn => {
           btn.onclick = () => { offset = Number(btn.dataset.week); load(); };

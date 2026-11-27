@@ -579,15 +579,8 @@
     paint();
     overlay.querySelector('[data-lightbox-close]').focus({ preventScroll: true });
   };
-  // 复制记忆正文：优先使用剪贴板 API，失败时回退到临时文本域。
-  function recordPlainText(record) {
-    const meta = [formatDate(record.occurredAt), record.mood, record.tags.join('、')].filter(Boolean).join(' · ');
-    const lines = [record.title, meta, '', record.content || '（这条记忆只有附件，没有文字描述。）'];
-    if (record.attachments.length) lines.push('', `附件：${record.attachments.map(file => file.name).join('、')}`);
-    return lines.join('\n');
-  }
-  async function copyRecordText(record) {
-    const text = recordPlainText(record);
+  // 复制文本：优先使用剪贴板 API，失败时回退到临时文本域。
+  async function writeClipboard(text) {
     let ok = false;
     try {
       if (navigator.clipboard && window.isSecureContext) { await navigator.clipboard.writeText(text); ok = true; }
@@ -604,6 +597,19 @@
         area.remove();
       } catch (error) { ok = false; }
     }
+    return ok;
+  }
+  window.SG.copyText = writeClipboard;
+
+  // 复制记忆正文：标题、日期/心情/标签、正文与附件名。
+  function recordPlainText(record) {
+    const meta = [formatDate(record.occurredAt), record.mood, record.tags.join('、')].filter(Boolean).join(' · ');
+    const lines = [record.title, meta, '', record.content || '（这条记忆只有附件，没有文字描述。）'];
+    if (record.attachments.length) lines.push('', `附件：${record.attachments.map(file => file.name).join('、')}`);
+    return lines.join('\n');
+  }
+  async function copyRecordText(record) {
+    const ok = await writeClipboard(recordPlainText(record));
     showToast(ok ? `已复制「${record.title}」` : '复制失败，请手动选择正文。', ok ? 'success' : 'error');
     return ok;
   }
