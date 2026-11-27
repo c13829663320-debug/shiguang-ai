@@ -106,6 +106,10 @@ svg { flex: 0 0 auto; }
 .btn-ghost { color: var(--ink-soft); }
 .btn-ghost:hover { background: var(--paper-deep); color: var(--ink); }
 .btn-danger { border-color: #e7c8c4; background: #fff8f6; color: var(--danger); }
+.btn.is-reading { background: var(--coral-soft); color: var(--coral-dark); }
+.btn.is-reading svg { animation: read-pulse 1.6s ease-in-out infinite; }
+@keyframes read-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .45; } }
+@media (prefers-reduced-motion: reduce) { .btn.is-reading svg { animation: none; } }
 .btn-sm { min-height: 32px; padding: 6px 10px; font-size: 12px; border-radius: 8px; }
 .btn-icon { width: 38px; min-height: 38px; padding: 8px; }
 .btn svg { width: 16px; height: 16px; }

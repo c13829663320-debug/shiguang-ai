@@ -23,6 +23,8 @@
     image: '<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="m3 17 5-4 4 3 3-3 6 5"/>',
     printer: '<path d="M7 8V3h10v5"/><path d="M7 17H5a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2"/><rect x="7" y="14" width="10" height="7" rx="1"/>',
     mic: '<rect x="9" y="3" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3M8 21h8"/>',
+    speaker: '<path d="M4 9.5v5h3.6L13 19V5L7.6 9.5Z"/><path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/>',
+    stop: '<rect x="6.5" y="6.5" width="11" height="11" rx="2.5"/>',
     video: '<rect x="3" y="6" width="13" height="12" rx="2"/><path d="m16 10 5-3v10l-5-3Z"/>',
     smile: '<circle cx="12" cy="12" r="9"/><path d="M8 14s1.5 3 4 3 4-3 4-3M9 9h.01M15 9h.01"/>',
     tag: '<path d="M3 4h8l10 10-7 7L3 10Z"/><circle cx="8" cy="8" r="1"/>',
@@ -130,6 +132,38 @@
     if (inCode) out.push(`<pre><code>${esc(code.join('\n'))}</code></pre>`);
     flushParagraph(); flushQuote(); closeList();
     return out.join('');
+  }
+
+  // 朗读用纯文本：去掉 Markdown 标记与链接地址，避免读出多余的符号。
+  function speakableText(value) {
+    return String(value || '')
+      .replace(/```[\s\S]*?```/g, ' ')
+      .replace(/!\[[^\]]*\]\([^)]*\)/g, ' ')
+      .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+      .replace(/https?:\/\/\S+/g, ' ')
+      .replace(/^#{1,6}\s*/gm, '')
+      .replace(/[*_~`>#]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  // 记忆朗读：同一时间只朗读一条记忆，关闭弹窗或切换记忆时自动停止。
+  const speech = { synth: 'speechSynthesis' in window ? window.speechSynthesis : null, current: null };
+  const canSpeak = () => Boolean(speech.synth && 'SpeechSynthesisUtterance' in window);
+  const setReadButton = (button, reading) => {
+    if (!button) return;
+    button.innerHTML = reading ? `${getIcon('stop', 15)} 停止朗读` : `${getIcon('speaker', 15)} 朗读`;
+    button.classList.toggle('is-reading', reading);
+    button.setAttribute('aria-pressed', String(reading));
+  };
+  function stopReading() {
+    const current = speech.current;
+    if (!current) return;
+    speech.current = null;
+    current.utterance.onend = null;
+    current.utterance.onerror = null;
+    try { speech.synth.cancel(); } catch (error) { /* 部分浏览器可能不支持 */ }
+    if (document.contains(current.button)) setReadButton(current.button, false);
   }
 
   // 搜索结果高亮：按原文切分后逐段转义，避免命中特殊字符时破坏转义结果。
@@ -559,7 +593,7 @@
     </div>` : '';
     const relatedHTML = related.length ? `<div class="related-block"><div class="related-title">${getIcon('link', 14)} 相关记忆</div><div class="related-list">${related.map(item => `<button class="related-item" data-related="${item.id}"><span class="related-item-title">${esc(item.title)}</span><span class="related-item-meta">${formatDate(item.occurredAt, false)} · ${item.sharedTags.length ? `共同标签：${item.sharedTags.map(esc).join('、')}` : '内容相近'}</span></button>`).join('')}</div></div>` : '';
     const overlay = document.createElement('div'); overlay.className = 'modal-overlay';
-    overlay.innerHTML = `<div class="modal modal-lg" role="dialog" aria-modal="true"><div class="modal-header"><div><span class="memory-type">${getIcon(icon, 14)} ${type}</span><h3 class="modal-title" style="margin-top:7px">${esc(record.title)}</h3></div><div class="row">${navHTML}<button class="btn btn-ghost btn-icon" data-close>${getIcon('x')}</button></div></div><div class="modal-body"><div class="detail-meta"><span>${getIcon('calendar', 13)} ${formatDate(record.occurredAt)} ${formatTime(record.occurredAt)}</span><span>${getIcon('smile', 13)} ${esc(record.mood)}</span><span>${esc(record.source)}</span></div><div class="memory-tags" style="margin-bottom:18px">${record.tags.map(tag => `<span class="tag tag-teal">${esc(tag)}</span>`).join('')}</div><div class="detail-content">${renderMarkdown(record.content || '这条记忆只有附件，没有文字描述。')}</div>${record.attachments.map(attachmentHTML).join('')}${relatedHTML}</div><div class="modal-footer detail-footer" style="justify-content:space-between"><div class="row"><button class="btn btn-ghost btn-sm" id="detail-pin">${getIcon('pin', 15)} ${record.pinned ? '取消置顶' : '置顶'}</button><button class="btn btn-ghost btn-sm" id="detail-export">${getIcon('image', 15)} 长图</button><button class="btn btn-ghost btn-sm" id="detail-delete">${getIcon('trash', 15)} 删除</button></div><div class="row"><button class="btn btn-secondary btn-sm" id="detail-share">${getIcon('image', 15)} 分享卡片</button><button class="btn btn-dark" id="detail-edit">${getIcon('edit', 15)} 编辑记忆</button></div></div></div>`;
+    overlay.innerHTML = `<div class="modal modal-lg" role="dialog" aria-modal="true"><div class="modal-header"><div><span class="memory-type">${getIcon(icon, 14)} ${type}</span><h3 class="modal-title" style="margin-top:7px">${esc(record.title)}</h3></div><div class="row">${navHTML}<button class="btn btn-ghost btn-icon" data-close>${getIcon('x')}</button></div></div><div class="modal-body"><div class="detail-meta"><span>${getIcon('calendar', 13)} ${formatDate(record.occurredAt)} ${formatTime(record.occurredAt)}</span><span>${getIcon('smile', 13)} ${esc(record.mood)}</span><span>${esc(record.source)}</span></div><div class="memory-tags" style="margin-bottom:18px">${record.tags.map(tag => `<span class="tag tag-teal">${esc(tag)}</span>`).join('')}</div><div class="detail-content">${renderMarkdown(record.content || '这条记忆只有附件，没有文字描述。')}</div>${record.attachments.map(attachmentHTML).join('')}${relatedHTML}</div><div class="modal-footer detail-footer" style="justify-content:space-between"><div class="row"><button class="btn btn-ghost btn-sm" id="detail-pin">${getIcon('pin', 15)} ${record.pinned ? '取消置顶' : '置顶'}</button>${canSpeak() ? `<button class="btn btn-ghost btn-sm" id="detail-read" type="button" aria-pressed="false">${getIcon('speaker', 15)} 朗读</button>` : ''}<button class="btn btn-ghost btn-sm" id="detail-export">${getIcon('image', 15)} 长图</button><button class="btn btn-ghost btn-sm" id="detail-delete">${getIcon('trash', 15)} 删除</button></div><div class="row"><button class="btn btn-secondary btn-sm" id="detail-share">${getIcon('image', 15)} 分享卡片</button><button class="btn btn-dark" id="detail-edit">${getIcon('edit', 15)} 编辑记忆</button></div></div></div>`;
     document.body.appendChild(overlay);
     const imageAttachments = record.attachments.filter(file => file.type === 'image' && (file.dataUrl || file.url));
     if (imageAttachments.length) {
@@ -590,6 +624,41 @@
     overlay.querySelector('#detail-export').onclick = () => { document.removeEventListener('keydown', onNavKey, true); overlay.remove(); openMemoryLongImage(id); };
     overlay.querySelector('#detail-edit').onclick = () => { document.removeEventListener('keydown', onNavKey, true); overlay.remove(); openRecordEditor(id); };
     overlay.querySelector('#detail-pin').onclick = () => { document.removeEventListener('keydown', onNavKey, true); MemoryStore.togglePin(id); overlay.remove(); showToast('置顶状态已更新', 'success'); };
+    const readButton = overlay.querySelector('#detail-read');
+    if (readButton) {
+      let queued = null;
+      const finish = () => {
+        if (!speech.current || speech.current.button !== readButton) return;
+        speech.current = null;
+        setReadButton(readButton, false);
+      };
+      readButton.onclick = () => {
+        if (speech.current && speech.current.button === readButton) { stopReading(); return; }
+        stopReading();
+        const text = [record.title, speakableText(record.content)].filter(Boolean).join('。');
+        if (!text) { showToast('这条记忆没有可朗读的文字。', 'info'); return; }
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = 'zh-CN';
+        utterance.rate = 1;
+        utterance.onend = finish;
+        utterance.onerror = finish;
+        speech.current = { button: readButton, utterance };
+        setReadButton(readButton, true);
+        // 刚 cancel 完立刻 speak，部分 Chrome 版本会丢弃新的朗读，稍等一拍更稳。
+        queued = setTimeout(() => {
+          if (!speech.current || speech.current.utterance !== utterance) return;
+          try { speech.synth.speak(utterance); } catch (error) { stopReading(); }
+        }, 60);
+      };
+      // 右上角关闭、点遮罩、按 Esc、切换到相邻记忆都会移除弹窗，这里统一收尾。
+      const watcher = new MutationObserver(() => {
+        if (document.body.contains(overlay)) return;
+        watcher.disconnect();
+        if (queued) clearTimeout(queued);
+        if (speech.current && speech.current.button === readButton) stopReading();
+      });
+      watcher.observe(document.body, { childList: true });
+    }
     overlay.querySelector('#detail-delete').onclick = () => {
       document.removeEventListener('keydown', onNavKey, true);
       overlay.remove();
