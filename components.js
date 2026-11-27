@@ -1446,6 +1446,13 @@
 
   // 记忆草稿：只保存文字字段，附件体积大不写入草稿，避免撑爆本地存储。
   const RECORD_DRAFT_KEY = 'shiguangai_record_draft';
+  // 新建记忆的文字模板：只提供正文骨架与建议标签，标题留给用户自己写。
+  const RECORD_TEMPLATES = [
+    { name: '学习笔记', tags: '学习', body: '今天学到的三件事：\n\n1. \n2. \n3. \n\n我的思考：' },
+    { name: '会议记录', tags: '工作', body: '背景：\n\n讨论要点：\n\n下一步：' },
+    { name: '灵感速记', tags: '灵感', body: '灵感：\n\n可以怎么用：' },
+    { name: '旅行见闻', tags: '生活', body: '去了哪里：\n\n印象最深的一幕：' }
+  ];
   function readRecordDraft() {
     try {
       const raw = JSON.parse(localStorage.getItem(RECORD_DRAFT_KEY) || 'null');
@@ -1486,7 +1493,7 @@
     const unlockDefault = `${unlockDate.getFullYear()}-${String(unlockDate.getMonth() + 1).padStart(2, '0')}-${String(unlockDate.getDate()).padStart(2, '0')}`;
     const capsuleHTML = existing ? '' : `<div class="field capsule-field"><label class="capsule-toggle"><input type="checkbox" id="record-capsule">${getIcon('lock', 15)}<span>封存为时间胶囊</span></label><div class="capsule-date" id="capsule-date" hidden><input class="input" id="record-unlock" type="date" value="${unlockDefault}"><span class="field-hint">到开启日期前，这条记忆不会出现在搜索、洞察与导出中；到期会自动转为普通记忆。</span></div></div>`;
     const overlay = document.createElement('div'); overlay.className = 'modal-overlay';
-    overlay.innerHTML = `<div class="modal modal-lg" role="dialog" aria-modal="true"><form id="record-form"><div class="modal-header"><div><div class="eyebrow">${existing ? 'EDIT MEMORY' : 'CAPTURE THE MOMENT'}</div><h3 class="modal-title">${existing ? '编辑记忆' : '此刻，值得留下'}</h3></div><button class="btn btn-ghost btn-icon" type="button" data-close>${getIcon('x')}</button></div><div class="modal-body"><div class="form-stack"><div class="draft-notice" id="draft-notice" hidden><span></span><button type="button" class="btn btn-ghost btn-sm" id="discard-draft">丢弃草稿</button></div><div class="field"><label class="field-label" for="record-title">标题</label><input class="input" id="record-title" maxlength="80" value="${esc(record.title)}" placeholder="给这段记忆一个名字，留空将自动截取正文"></div><div class="field"><label class="field-label" for="record-content">正文</label><textarea class="textarea" id="record-content" style="min-height:160px" placeholder="发生了什么？当时的你在想什么？">${esc(record.content)}</textarea></div><div class="form-grid"><div class="field"><label class="field-label" for="record-type">记忆类型</label><select class="select" id="record-type">${Object.entries(typeMap).map(([key, value]) => `<option value="${key}" ${record.type === key ? 'selected' : ''}>${value[0]}</option>`).join('')}</select></div><div class="field"><label class="field-label" for="record-date">发生时间</label><input class="input" id="record-date" type="datetime-local" value="${dateValue}" required></div><div class="field"><label class="field-label" for="record-mood">此刻心情</label><select class="select" id="record-mood">${['平静', '愉快', '有收获', '专注', '充实', '轻松', '期待', '温暖', '兴奋', '反思', '疲惫', '低落'].map(mood => `<option ${record.mood === mood ? 'selected' : ''}>${mood}</option>`).join('')}</select></div><div class="field"><label class="field-label" for="record-tags">标签</label><input class="input" id="record-tags" value="${esc(record.tags.join('，'))}" placeholder="学习，阅读（用逗号分隔）"><div class="tag-suggest" id="tag-suggest" aria-live="polite" hidden></div></div></div>${capsuleHTML}<div class="field"><span class="field-label">附件</span><div class="row wrap"><button class="btn btn-secondary btn-sm" type="button" id="add-attachment">${getIcon('upload', 14)} 添加文件</button><button class="btn btn-secondary btn-sm" type="button" id="record-audio">${getIcon('mic', 14)} 录制语音</button><button class="btn btn-secondary btn-sm" type="button" id="record-dictate" aria-pressed="false" title="把说的话转成正文">${getIcon('sparkles', 14)} 语音转文字</button><span class="field-hint">照片 / 语音 / 视频 / 文档，单个不超过 2MB</span></div><input type="file" id="attachment-input" multiple hidden accept="image/*,audio/*,video/*,.txt,.md,.csv,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx"><div class="editor-dropzone" id="editor-dropzone">${getIcon('upload', 15)}<span>把文件拖到这里，或按 Ctrl / ⌘ + V 粘贴图片</span></div><div class="editor-attachments" id="editor-attachments"></div></div></div></div><div class="modal-footer"><button class="btn btn-secondary" type="button" data-close>取消</button><button class="btn btn-primary" type="submit" id="save-record">${getIcon('check', 16)} ${existing ? '保存修改' : '存入时光'}</button></div></form></div>`;
+    overlay.innerHTML = `<div class="modal modal-lg" role="dialog" aria-modal="true"><form id="record-form"><div class="modal-header"><div><div class="eyebrow">${existing ? 'EDIT MEMORY' : 'CAPTURE THE MOMENT'}</div><h3 class="modal-title">${existing ? '编辑记忆' : '此刻，值得留下'}</h3></div><button class="btn btn-ghost btn-icon" type="button" data-close>${getIcon('x')}</button></div><div class="modal-body"><div class="form-stack"><div class="draft-notice" id="draft-notice" hidden><span></span><button type="button" class="btn btn-ghost btn-sm" id="discard-draft">丢弃草稿</button></div>${existing ? '' : `<div class="field"><span class="field-label">从模板开始</span><div class="row wrap" id="record-templates">${RECORD_TEMPLATES.map((item, index) => `<button class="btn btn-secondary btn-sm" type="button" data-template="${index}">${item.name}</button>`).join('')}</div><span class="field-hint">模板只填充正文骨架和建议标签，标题留给你自己写。</span></div>`}<div class="field"><label class="field-label" for="record-title">标题</label><input class="input" id="record-title" maxlength="80" value="${esc(record.title)}" placeholder="给这段记忆一个名字，留空将自动截取正文"></div><div class="field"><label class="field-label" for="record-content">正文</label><textarea class="textarea" id="record-content" style="min-height:160px" placeholder="发生了什么？当时的你在想什么？">${esc(record.content)}</textarea></div><div class="form-grid"><div class="field"><label class="field-label" for="record-type">记忆类型</label><select class="select" id="record-type">${Object.entries(typeMap).map(([key, value]) => `<option value="${key}" ${record.type === key ? 'selected' : ''}>${value[0]}</option>`).join('')}</select></div><div class="field"><label class="field-label" for="record-date">发生时间</label><input class="input" id="record-date" type="datetime-local" value="${dateValue}" required></div><div class="field"><label class="field-label" for="record-mood">此刻心情</label><select class="select" id="record-mood">${['平静', '愉快', '有收获', '专注', '充实', '轻松', '期待', '温暖', '兴奋', '反思', '疲惫', '低落'].map(mood => `<option ${record.mood === mood ? 'selected' : ''}>${mood}</option>`).join('')}</select></div><div class="field"><label class="field-label" for="record-tags">标签</label><input class="input" id="record-tags" value="${esc(record.tags.join('，'))}" placeholder="学习，阅读（用逗号分隔）"><div class="tag-suggest" id="tag-suggest" aria-live="polite" hidden></div></div></div>${capsuleHTML}<div class="field"><span class="field-label">附件</span><div class="row wrap"><button class="btn btn-secondary btn-sm" type="button" id="add-attachment">${getIcon('upload', 14)} 添加文件</button><button class="btn btn-secondary btn-sm" type="button" id="record-audio">${getIcon('mic', 14)} 录制语音</button><button class="btn btn-secondary btn-sm" type="button" id="record-dictate" aria-pressed="false" title="把说的话转成正文">${getIcon('sparkles', 14)} 语音转文字</button><span class="field-hint">照片 / 语音 / 视频 / 文档，单个不超过 2MB</span></div><input type="file" id="attachment-input" multiple hidden accept="image/*,audio/*,video/*,.txt,.md,.csv,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx"><div class="editor-dropzone" id="editor-dropzone">${getIcon('upload', 15)}<span>把文件拖到这里，或按 Ctrl / ⌘ + V 粘贴图片</span></div><div class="editor-attachments" id="editor-attachments"></div></div></div></div><div class="modal-footer"><button class="btn btn-secondary" type="button" data-close>取消</button><button class="btn btn-primary" type="submit" id="save-record">${getIcon('check', 16)} ${existing ? '保存修改' : '存入时光'}</button></div></form></div>`;
     document.body.appendChild(overlay);
     const capsuleToggle = overlay.querySelector('#record-capsule');
     if (capsuleToggle) capsuleToggle.onchange = () => {
@@ -1496,6 +1503,25 @@
     };
     const renderAttachments = () => { overlay.querySelector('#editor-attachments').innerHTML = attachments.map((file, index) => `<div class="editor-attachment">${getIcon(typeMap[file.type]?.[1] || 'file', 15)}<span>${esc(file.name)} · ${fileSize(file.size)}</span><button type="button" class="btn btn-ghost btn-icon btn-sm" data-remove-file="${index}" aria-label="移除附件">${getIcon('x', 14)}</button></div>`).join(''); };
     renderAttachments();
+    if (!existing) {
+      overlay.querySelector('#record-templates').addEventListener('click', event => {
+        const btn = event.target.closest('[data-template]');
+        if (!btn) return;
+        const titleInput = overlay.querySelector('#record-title');
+        const contentInput = overlay.querySelector('#record-content');
+        const tagsInput = overlay.querySelector('#record-tags');
+        if (titleInput.value.trim() || contentInput.value.trim()) { showToast('先清空标题和正文，再套用模板。', 'info'); return; }
+        const template = RECORD_TEMPLATES[Number(btn.dataset.template)];
+        contentInput.value = template.body;
+        const tags = tagsInput.value.split(/[,，]/).map(value => value.trim()).filter(Boolean);
+        if (!tags.includes(template.tags)) tags.push(template.tags);
+        tagsInput.value = tags.join('，');
+        refreshTagSuggest();
+        contentInput.focus();
+        showToast(`已套用「${template.name}」模板`, 'success');
+        queueDraft();
+      });
+    }
     const draftNotice = overlay.querySelector('#draft-notice');
     const draftLabel = draftNotice.querySelector('span');
     const draftState = { timer: null, saved: false };
