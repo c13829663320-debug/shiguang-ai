@@ -12,14 +12,14 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" type="image/png" href="icons/icon-192.png">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
-  <link rel="stylesheet" href="styles.css?v=24">
+  <link rel="stylesheet" href="styles.css?v=25">
 </head>
 <body>
   <div id="app"></div>
 
-  <script src="mock.js?v=24"></script>
+  <script src="mock.js?v=25"></script>
   <script src="api.js?v=20"></script>
-  <script src="components.js?v=27"></script>
+  <script src="components.js?v=28"></script>
   <script>
     (function () {
       const app = document.getElementById('app');
@@ -120,6 +120,12 @@
             ${settingRow('自动整理', 'autoOrganize', '保存时自动截取标题、去重标签。')}
             ${settingRow('每日回顾提醒', 'reminder', '打开工作台时，自动提醒你回顾一条旧记忆。')}
             ${settingRow('减少动效', 'reduceMotion', '关闭卡片悬浮、弹窗动画等效果。')}
+            <div class="setting-row">
+              <div><div class="setting-name">记忆正文字号</div><div class="setting-note">只影响记忆详情里的正文阅读大小。</div></div>
+              <div class="row wrap" role="group" aria-label="记忆正文字号">
+                ${[[0.9, '紧凑'], [1, '标准'], [1.15, '宽松']].map(([value, label]) => `<button class="btn btn-sm ${Number(settings.readingScale) === value ? 'btn-dark' : 'btn-secondary'}" data-reading-scale="${value}" aria-pressed="${Number(settings.readingScale) === value}">${label}</button>`).join('')}
+              </div>
+            </div>
             <div class="setting-row">
               <div><div class="setting-name">夜间模式</div><div class="setting-note">深色纸感主题，夜间查看更柔和。</div></div>
               <button type="button" class="switch ${settings.theme === 'dark' ? 'active' : ''}" data-theme-toggle role="switch" aria-checked="${settings.theme === 'dark'}" aria-label="夜间模式"></button>
@@ -225,6 +231,16 @@
             }
           });
         }
+
+        app.querySelectorAll('[data-reading-scale]').forEach(btn => {
+          btn.onclick = () => {
+            const value = Number(btn.dataset.readingScale);
+            if (value === Number(MemoryStore.settings().readingScale)) return;
+            MemoryStore.updateSettings({ readingScale: value });
+            showToast(`记忆字号已设为「${btn.textContent.trim()}」`, 'success');
+            render();
+          };
+        });
 
         on('open-tag-manager', () => openTagManager());
         on('open-trash', () => openTrashManager());

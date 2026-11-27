@@ -19,6 +19,7 @@
     apiKey: '',
     aiEnabled: false,
     autoOrganize: true,
+    readingScale: 1,
     reduceMotion: false,
     reminder: true,
     theme: 'light',
