@@ -174,6 +174,13 @@
       }).sort((a, b) => Number(b.pinned) - Number(a.pinned) || b.occurredAt - a.occurredAt);
     },
     getRecord(id) { const found = db.records.find(item => item.id === id); return found ? clone(found) : null; },
+    // 时光漫游：从记忆库里随机抽一条，可排除指定 id 避免连续抽中同一条。
+    randomRecord(excludeIds = []) {
+      const skipped = new Set(excludeIds);
+      const pool = db.records.filter(record => !skipped.has(record.id));
+      if (!pool.length) return null;
+      return clone(pool[Math.floor(Math.random() * pool.length)]);
+    },
     isLocked(record) { return Number(record && record.unlockAt) > Date.now(); },
     capsules() { unlockDueCapsules(); return clone(db.capsules).sort((a, b) => a.unlockAt - b.unlockAt); },
     getCapsule(id) { const found = db.capsules.find(item => item.id === id); return found ? clone(found) : null; },

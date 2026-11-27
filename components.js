@@ -325,6 +325,7 @@
       if (query) SG.rememberSearch(query);
       close();
       if (item.kind === 'record') window.openRecordDetail(item.id);
+      else if (item.kind === 'action' && item.action === 'random') window.openRandomMemory();
       else if (item.kind === 'action') window.openRecordEditor();
       else location.href = item.href;
     };
@@ -356,6 +357,7 @@
           group: query ? '相关记忆' : '最近的记忆'
         })),
         ...(query ? [] : [{ kind: 'action', title: '留下此刻（新建记忆）', meta: '快速记录', icon: 'plus', group: '操作' }]),
+        ...(query ? [] : [{ kind: 'action', action: 'random', title: '时光漫游（随机翻一条）', meta: '随便看看', icon: 'compass', group: '操作' }]),
         ...pages.map(page => ({ kind: 'page', href: page[1], title: page[0], titleHTML: highlight(page[0], query), meta: '页面跳转', icon: page[2], group: '页面' }))
       ];
       active = 0;
@@ -698,6 +700,15 @@
         onClick: () => { MemoryStore.restoreRecord(id); showToast('已恢复这条记忆', 'success'); }
       });
     };
+  };
+
+  // 时光漫游：没有明确目标时，从全部记忆里随机翻出一条来读。
+  window.openRandomMemory = function (excludeIds = []) {
+    if (!MemoryStore.listRecords().length) { showToast('记忆库还是空的，先留下第一条吧。', 'info'); return false; }
+    const record = MemoryStore.randomRecord(excludeIds);
+    if (!record) { showToast('暂时没有别的记忆可以漫游了。', 'info'); return false; }
+    openRecordDetail(record.id);
+    return true;
   };
 
   // 时间胶囊详情：封存期间只展示标题与日期，内容完全不渲染，避免从 DOM 泄露。

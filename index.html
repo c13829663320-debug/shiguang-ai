@@ -17,9 +17,9 @@
 <body>
   <div id="app"></div>
 
-  <script src="mock.js?v=23"></script>
+  <script src="mock.js?v=24"></script>
   <script src="api.js?v=20"></script>
-  <script src="components.js?v=24"></script>
+  <script src="components.js?v=25"></script>
   <script>
     (function () {
       const app = document.getElementById('app');
@@ -106,6 +106,7 @@
               title: '工作台', subtitle: '随手记录，自动归档，随时找回',
               actions: `
                 <a class="btn btn-secondary" href="assistant.html">${getIcon('sparkles', 16)}<span class="optional"> 问记忆助手</span></a>
+                <button class="btn btn-secondary" id="roam-btn" type="button">${getIcon('compass', 16)}<span class="optional"> 漫游</span></button>
                 <button class="btn btn-dark" data-action="new-record">${getIcon('plus', 16)} 完整记录</button>`
             })}
             <div class="page-content">
@@ -172,6 +173,7 @@
           btn.onclick = () => openRecordEditor(null, null, { type: btn.dataset.preset });
         });
         document.getElementById('open-daily-review').onclick = () => openDailyReview();
+        document.getElementById('roam-btn').onclick = () => openRandomMemory();
       }
 
       function quickSave() {
