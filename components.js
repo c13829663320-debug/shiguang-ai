@@ -577,6 +577,35 @@
     paint();
     overlay.querySelector('[data-lightbox-close]').focus({ preventScroll: true });
   };
+  // 复制记忆正文：优先使用剪贴板 API，失败时回退到临时文本域。
+  function recordPlainText(record) {
+    const meta = [formatDate(record.occurredAt), record.mood, record.tags.join('、')].filter(Boolean).join(' · ');
+    const lines = [record.title, meta, '', record.content || '（这条记忆只有附件，没有文字描述。）'];
+    if (record.attachments.length) lines.push('', `附件：${record.attachments.map(file => file.name).join('、')}`);
+    return lines.join('\n');
+  }
+  async function copyRecordText(record) {
+    const text = recordPlainText(record);
+    let ok = false;
+    try {
+      if (navigator.clipboard && window.isSecureContext) { await navigator.clipboard.writeText(text); ok = true; }
+    } catch (error) { ok = false; }
+    if (!ok) {
+      try {
+        const area = document.createElement('textarea');
+        area.value = text;
+        area.setAttribute('readonly', '');
+        area.style.cssText = 'position:fixed;top:-1000px;opacity:0';
+        document.body.appendChild(area);
+        area.select();
+        ok = document.execCommand('copy');
+        area.remove();
+      } catch (error) { ok = false; }
+    }
+    showToast(ok ? `已复制「${record.title}」` : '复制失败，请手动选择正文。', ok ? 'success' : 'error');
+    return ok;
+  }
+
   window.openRecordDetail = function (id) {
     const record = MemoryStore.getRecord(id); if (!record) { showToast('这条记忆不存在或已删除。', 'error'); return; }
     const [type, icon] = typeMap[record.type] || typeMap.text;
@@ -593,7 +622,7 @@
     </div>` : '';
     const relatedHTML = related.length ? `<div class="related-block"><div class="related-title">${getIcon('link', 14)} 相关记忆</div><div class="related-list">${related.map(item => `<button class="related-item" data-related="${item.id}"><span class="related-item-title">${esc(item.title)}</span><span class="related-item-meta">${formatDate(item.occurredAt, false)} · ${item.sharedTags.length ? `共同标签：${item.sharedTags.map(esc).join('、')}` : '内容相近'}</span></button>`).join('')}</div></div>` : '';
     const overlay = document.createElement('div'); overlay.className = 'modal-overlay';
-    overlay.innerHTML = `<div class="modal modal-lg" role="dialog" aria-modal="true"><div class="modal-header"><div><span class="memory-type">${getIcon(icon, 14)} ${type}</span><h3 class="modal-title" style="margin-top:7px">${esc(record.title)}</h3></div><div class="row">${navHTML}<button class="btn btn-ghost btn-icon" data-close>${getIcon('x')}</button></div></div><div class="modal-body"><div class="detail-meta"><span>${getIcon('calendar', 13)} ${formatDate(record.occurredAt)} ${formatTime(record.occurredAt)}</span><span>${getIcon('smile', 13)} ${esc(record.mood)}</span><span>${esc(record.source)}</span></div><div class="memory-tags" style="margin-bottom:18px">${record.tags.map(tag => `<span class="tag tag-teal">${esc(tag)}</span>`).join('')}</div><div class="detail-content">${renderMarkdown(record.content || '这条记忆只有附件，没有文字描述。')}</div>${record.attachments.map(attachmentHTML).join('')}${relatedHTML}</div><div class="modal-footer detail-footer" style="justify-content:space-between"><div class="row"><button class="btn btn-ghost btn-sm" id="detail-pin">${getIcon('pin', 15)} ${record.pinned ? '取消置顶' : '置顶'}</button>${canSpeak() ? `<button class="btn btn-ghost btn-sm" id="detail-read" type="button" aria-pressed="false">${getIcon('speaker', 15)} 朗读</button>` : ''}<button class="btn btn-ghost btn-sm" id="detail-export">${getIcon('image', 15)} 长图</button><button class="btn btn-ghost btn-sm" id="detail-delete">${getIcon('trash', 15)} 删除</button></div><div class="row"><button class="btn btn-secondary btn-sm" id="detail-share">${getIcon('image', 15)} 分享卡片</button><button class="btn btn-dark" id="detail-edit">${getIcon('edit', 15)} 编辑记忆</button></div></div></div>`;
+    overlay.innerHTML = `<div class="modal modal-lg" role="dialog" aria-modal="true"><div class="modal-header"><div><span class="memory-type">${getIcon(icon, 14)} ${type}</span><h3 class="modal-title" style="margin-top:7px">${esc(record.title)}</h3></div><div class="row">${navHTML}<button class="btn btn-ghost btn-icon" data-close>${getIcon('x')}</button></div></div><div class="modal-body"><div class="detail-meta"><span>${getIcon('calendar', 13)} ${formatDate(record.occurredAt)} ${formatTime(record.occurredAt)}</span><span>${getIcon('smile', 13)} ${esc(record.mood)}</span><span>${esc(record.source)}</span></div><div class="memory-tags" style="margin-bottom:18px">${record.tags.map(tag => `<span class="tag tag-teal">${esc(tag)}</span>`).join('')}</div><div class="detail-content">${renderMarkdown(record.content || '这条记忆只有附件，没有文字描述。')}</div>${record.attachments.map(attachmentHTML).join('')}${relatedHTML}</div><div class="modal-footer detail-footer" style="justify-content:space-between"><div class="row"><button class="btn btn-ghost btn-sm" id="detail-pin">${getIcon('pin', 15)} ${record.pinned ? '取消置顶' : '置顶'}</button>${canSpeak() ? `<button class="btn btn-ghost btn-sm" id="detail-read" type="button" aria-pressed="false">${getIcon('speaker', 15)} 朗读</button>` : ''}<button class="btn btn-ghost btn-sm" id="detail-copy">${getIcon('copy', 15)} 复制</button><button class="btn btn-ghost btn-sm" id="detail-export">${getIcon('image', 15)} 长图</button><button class="btn btn-ghost btn-sm" id="detail-delete">${getIcon('trash', 15)} 删除</button></div><div class="row"><button class="btn btn-secondary btn-sm" id="detail-share">${getIcon('image', 15)} 分享卡片</button><button class="btn btn-dark" id="detail-edit">${getIcon('edit', 15)} 编辑记忆</button></div></div></div>`;
     document.body.appendChild(overlay);
     const imageAttachments = record.attachments.filter(file => file.type === 'image' && (file.dataUrl || file.url));
     if (imageAttachments.length) {
@@ -623,6 +652,7 @@
     overlay.querySelector('#detail-share').onclick = () => openShareCard(id);
     overlay.querySelector('#detail-export').onclick = () => { document.removeEventListener('keydown', onNavKey, true); overlay.remove(); openMemoryLongImage(id); };
     overlay.querySelector('#detail-edit').onclick = () => { document.removeEventListener('keydown', onNavKey, true); overlay.remove(); openRecordEditor(id); };
+    overlay.querySelector('#detail-copy').onclick = () => copyRecordText(record);
     overlay.querySelector('#detail-pin').onclick = () => { document.removeEventListener('keydown', onNavKey, true); MemoryStore.togglePin(id); overlay.remove(); showToast('置顶状态已更新', 'success'); };
     const readButton = overlay.querySelector('#detail-read');
     if (readButton) {
@@ -1253,10 +1283,11 @@
     if (!record) { showToast('还没有可以回顾的旧记忆，再多记录几天吧。', 'info'); return; }
     const [type, icon] = typeMap[record.type] || typeMap.text;
     const overlay = document.createElement('div'); overlay.className = 'modal-overlay';
-    overlay.innerHTML = `<div class="modal modal-review" role="dialog" aria-modal="true"><div class="modal-header"><div><span class="review-kicker">${getIcon('sparkles', 14)} DAILY REVIEW · 每日回顾</span><h3 class="modal-title" style="margin-top:8px">${esc(record.title)}</h3></div><button class="btn btn-ghost btn-icon" data-close>${getIcon('x')}</button></div><div class="modal-body"><div class="detail-meta"><span>${getIcon('calendar', 13)} ${formatDate(record.occurredAt)}</span><span>${getIcon(icon, 13)} ${type}</span><span>${getIcon('smile', 13)} ${esc(record.mood)}</span></div><p class="review-lead">偶然翻到这一条，也许值得再读一遍。</p><div class="detail-content">${renderMarkdown(record.content || '这条记忆只有附件，没有文字描述。')}</div><div class="memory-tags" style="margin-top:18px">${record.tags.map(tag => `<span class="tag tag-teal">${esc(tag)}</span>`).join('')}</div><button class="btn btn-ghost btn-sm" id="review-open-detail" style="margin-top:14px">${getIcon('external', 14)} 打开完整记忆</button></div><div class="modal-footer"><button class="btn btn-secondary" data-close>稍后</button><button class="btn btn-primary" id="review-done">${getIcon('check', 16)} 记住了</button></div></div>`;
+    overlay.innerHTML = `<div class="modal modal-review" role="dialog" aria-modal="true"><div class="modal-header"><div><span class="review-kicker">${getIcon('sparkles', 14)} DAILY REVIEW · 每日回顾</span><h3 class="modal-title" style="margin-top:8px">${esc(record.title)}</h3></div><button class="btn btn-ghost btn-icon" data-close>${getIcon('x')}</button></div><div class="modal-body"><div class="detail-meta"><span>${getIcon('calendar', 13)} ${formatDate(record.occurredAt)}</span><span>${getIcon(icon, 13)} ${type}</span><span>${getIcon('smile', 13)} ${esc(record.mood)}</span></div><p class="review-lead">偶然翻到这一条，也许值得再读一遍。</p><div class="detail-content">${renderMarkdown(record.content || '这条记忆只有附件，没有文字描述。')}</div><div class="memory-tags" style="margin-top:18px">${record.tags.map(tag => `<span class="tag tag-teal">${esc(tag)}</span>`).join('')}</div><div class="row wrap" style="margin-top:14px"><button class="btn btn-ghost btn-sm" id="review-open-detail">${getIcon('external', 14)} 打开完整记忆</button><button class="btn btn-ghost btn-sm" id="review-copy">${getIcon('copy', 14)} 复制正文</button></div></div><div class="modal-footer"><button class="btn btn-secondary" data-close>稍后</button><button class="btn btn-primary" id="review-done">${getIcon('check', 16)} 记住了</button></div></div>`;
     document.body.appendChild(overlay);
     overlay.querySelectorAll('[data-close]').forEach(btn => btn.onclick = () => overlay.remove());
     overlay.querySelector('#review-open-detail').onclick = () => { overlay.remove(); openRecordDetail(record.id); };
+    overlay.querySelector('#review-copy').onclick = () => copyRecordText(record);
     overlay.querySelector('#review-done').onclick = () => {
       overlay.remove();
       MemoryStore.markReviewed();
